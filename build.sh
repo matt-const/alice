@@ -8,6 +8,7 @@ if [[ "$(uname)" == "Linux" ]]; then
   # ------------------------------------------------------------
   # #-- Compile Shaders
   
+  echo "compiling shaders..."
   pushd src/render/render_shader/ > /dev/null
   ./compile_opengl4.sh
   popd > /dev/null

@@ -620,26 +620,26 @@ typedef struct Core_File_Async_State {
   U64 os_handle_1;
 } Core_File_Async_State;
 
-cb_function Core_Context *		      	core_context              (void);
-cb_function void                			core_stream_write         (Str buffer, Core_Stream stream);
-cb_function void                			core_panic                (Str reason);
-cb_function Local_Time          			core_local_time           (void);
+cb_function Core_Context *            core_context              (void);
+cb_function void                      core_stream_write         (Str buffer, Core_Stream stream);
+cb_function void                      core_panic                (Str reason);
+cb_function Local_Time                core_local_time           (void);
 
-cb_function U08 *               			core_memory_reserve       (U64 bytes);
-cb_function void                			core_memory_unreserve     (void *virtual_base, U64 bytes);
-cb_function void                			core_memory_commit        (void *virtual_base, U64 bytes, Core_Commit_Flag mode);
-cb_function void                			core_memory_uncommit      (void *virtual_base, U64 bytes);
+cb_function U08 *                     core_memory_reserve       (U64 bytes);
+cb_function void                      core_memory_unreserve     (void *virtual_base, U64 bytes);
+cb_function void                      core_memory_commit        (void *virtual_base, U64 bytes, Core_Commit_Flag mode);
+cb_function void                      core_memory_uncommit      (void *virtual_base, U64 bytes);
 
-cb_function void                			core_entry_point          (I32 arg_count, char **arg_values);
+cb_function void                      core_entry_point          (I32 arg_count, char **arg_values);
 
-cb_function B32                 			core_directory_create     (Str folder_path);
-cb_function B32                 			core_directory_delete     (Str folder_path);
+cb_function B32                       core_directory_create     (Str folder_path);
+cb_function B32                       core_directory_delete     (Str folder_path);
 
-cb_function Core_File           			core_file_open            (Str file_path, Core_File_Access_Flag flags);
-cb_function void                			core_file_close           (Core_File *file);
-cb_function U64                 			core_file_size            (Core_File *file);
+cb_function Core_File                 core_file_open            (Str file_path, Core_File_Access_Flag flags);
+cb_function void                      core_file_close           (Core_File *file);
+cb_function U64                       core_file_size            (Core_File *file);
 
-cb_function void                			core_file_read            (Core_File *file, U64 offset, U64 bytes, void *data);
+cb_function void                      core_file_read            (Core_File *file, U64 offset, U64 bytes, void *data);
 cb_function void                      core_file_write           (Core_File *file, U64 offset, U64 bytes, void *data);
 
 cb_function Core_File_Async_State     core_file_read_async      (Core_File *file, U64 offset, U64 bytes, void *data);
