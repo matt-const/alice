@@ -4,15 +4,15 @@
 // ------------------------------------------------------------
 // #-- NOTE(cmat): Unspported in WASM backend.
 
-#define WASM_Not_Supported core_panic(str_lit(Macro_Stringize(__func__) ": WASM backend not supported"));
+#define WASM_Not_Supported(proc_) core_panic(str_lit(Macro_Stringize(proc_) ": not supported on WASM backend."));
 
-cb_function B32       core_directory_create (Str folder_path)                                     { WASM_Not_Supported; return 0;               }
-cb_function B32       core_directory_delete (Str folder_path)                                     { WASM_Not_Supported; return 0;               }
-cb_function Core_File core_file_open        (Str file_path, Core_File_Access_Flag flags)          { WASM_Not_Supported; return (Core_File) { }; }
-cb_function U64       core_file_size        (Core_File *file)                                     { WASM_Not_Supported; return 0; return 0;     }
-cb_function void      core_file_write       (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported;                         }
-cb_function void      core_file_read        (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported;                         }
-cb_function void      core_file_close       (Core_File *file)                                     { WASM_Not_Supported;                         }
+cb_function B32       core_directory_create (Str folder_path)                                     { WASM_Not_Supported(core_directory_create); return 0;            }
+cb_function B32       core_directory_delete (Str folder_path)                                     { WASM_Not_Supported(core_directory_delete); return 0;            }
+cb_function Core_File core_file_open        (Str file_path, Core_File_Access_Flag flags)          { WASM_Not_Supported(core_file_open); return (Core_File) { };     }
+cb_function U64       core_file_size        (Core_File *file)                                     { WASM_Not_Supported(core_file_size); return 0; return 0;         }
+cb_function void      core_file_write       (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_write);                            }
+cb_function void      core_file_read        (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_read);                             }
+cb_function void      core_file_close       (Core_File *file)                                     { WASM_Not_Supported(core_file_close);                            }
 
 // ------------------------------------------------------------
 // #-- JS - WASM core API.

@@ -19,6 +19,10 @@
 
 # include "platform_linux.c"
 
+#elif OS_WASM
+
+# include "platform_wasm.c"
+
 #else
 # error "unsupported platform"
 #endif

@@ -373,7 +373,7 @@ cb_function void logger_format_entry_minimal(Logger_Entry *entry, U08 *entry_buf
    U32 zone_indent = u32_min(5, zone_depth);
    if (entry->type == Logger_Entry_Zone_Start && zone_indent) zone_indent -= 1;
    for (U32 index = 0; index < zone_indent; ++index) {
-     entry_buffer[buffer_at++] = '|';
+     entry_buffer[buffer_at++] = ' ';
      entry_buffer[buffer_at++] = ' ';
    }
    

@@ -263,7 +263,7 @@ typedef struct {
 
 
 #define Function_Metadata_Current ((Function_Metadata) {          \
-    .function     = str_lit(__func__),                            \
+    .function     = str_lit(__FUNCTION__),                        \
     .filename     = str_lit(__FILE__),                            \
     .line         = __LINE__                                      \
 })

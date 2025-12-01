@@ -17,9 +17,7 @@ cb_function Platform_Bootstrap linux_default_bootstrap(void) {
 
 cb_function Platform_Frame_State *platform_frame_state(void) {
   return &linux_frame_state;
-}
- 
- 
+} 
 
 cb_function void base_entry_point(Array_Str command_line) {
   Platform_Bootstrap boot = linux_default_bootstrap();

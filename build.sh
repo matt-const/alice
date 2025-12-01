@@ -59,6 +59,7 @@ linker_flags+=" -Wl,--no-entry"
 linker_flags+=" -Wl,-allow-undefined"
 linker_flags+=" -o alice_canvas.wasm"
 linker_flags+=" -Wl,--export=wasm_entry_point"
+linker_flags+=" -Wl,--export=wasm_next_frame"
 
 # NOTE(cmat): Copy required resources to build folder.
 cp "${source_folder}/web/index.html"      "${build_folder}/"

@@ -1,4 +1,4 @@
-// (C) Copyright 2025 Matyas Constansmacos
+// (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
 cb_global Core_Context macos_context = {};
