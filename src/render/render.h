@@ -27,8 +27,8 @@ enum {
 };
 
 typedef struct R_Buffer_Info {
-  U64             capacity;
-  R_Buffer_Mode   mode;
+  U64            capacity;
+  R_Buffer_Mode  mode;
 } R_Buffer_Info;
 
 cb_function R_Buffer        r_buffer_allocate (U64 capacity, R_Buffer_Mode mode);
@@ -45,9 +45,9 @@ enum {
 };
 
 typedef struct {
-  R_Texture_Format  format;
-  U32               width;
-  U32               height;
+  R_Texture_Format format;
+  U32              width;
+  U32              height;
 } R_Texture_Config;
 
 cb_function R_Texture r_texture_allocate (R_Texture_Config *config);
@@ -167,6 +167,7 @@ typedef struct {
 } R_Command_Draw;
 
 cb_function void r_command_reset  (void);
+
 cb_function void r_command_draw   (R_Command_Draw *draw);
 
 cb_function void r_init           (Platform_Render_Context *render_context);

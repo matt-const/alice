@@ -36,3 +36,4 @@ cb_function U08 *r_command_push(R_Command_Type type, U64 bytes) {
 cb_function void r_command_draw(R_Command_Draw *draw) {
   memory_copy(r_command_push(R_Command_Type_Draw, sizeof(R_Command_Draw)), draw, sizeof(R_Command_Draw));
 }
+

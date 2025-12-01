@@ -1,4 +1,4 @@
-// (C) Copyright 2025 Matyas Constans)
+// (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
 // ------------------------------------------------------------
@@ -70,11 +70,11 @@ cb_function Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) 
 #endif
 
   chunk.base_memory = core_memory_reserve(reserve_bytes);
-  chunk.next_page = chunk.base_memory;
-  chunk.reserved = reserve_bytes;
-  chunk.current = chunk.base_memory;
-  chunk.prev = prev;
-  chunk.next = 0;
+  chunk.next_page   = chunk.base_memory;
+  chunk.reserved    = reserve_bytes;
+  chunk.current     = chunk.base_memory;
+  chunk.prev        = prev;
+  chunk.next        = 0;
   
   // NOTE(cmat): Push chunk header first.
   Arena_Push header_alloc = { .align = Arena_Default_Align, .flags = 0 };

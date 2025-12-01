@@ -229,8 +229,9 @@ typedef struct Str {
   I08 *txt;
 } Str;
 
-#define str_lit(literal) ((Str) { .txt = (I08 *)(literal), .len = sizeof(literal) - 1 })
-#define str_expand(str) (str.len), (str.txt)
+#define str_lit(literal_) ((Str) { .txt = (I08 *)(literal_), .len = sizeof(literal_) - 1 })
+#define str_expand(str_) ((U32)(str_.len)), (str_.txt)
+
 force_inline cb_function Str str(U64 len, I08 *txt) { return (Str) { .len = len, .txt =txt }; }
 
 // ------------------------------------------------------------
@@ -538,7 +539,7 @@ force_inline cb_function F32 f32_sqrt(F32 x) {
 # endif
 
 #elif ARCH_X86
-#include <immintrin.h>
+# include <immintrin.h>
 
 force_inline cb_function F32 f32_floor(F32 x) {
   return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_set_ss(x)));
@@ -550,6 +551,20 @@ force_inline cb_function F32 f32_ceil(F32 x) {
 
 force_inline cb_function F32 f32_sqrt(F32 x) {
   return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(x)));
+}
+
+#elif ARCH_WASM
+
+force_inline cb_function F32 f32_floor(F32 x) {
+  return __builtin_floorf(x);
+}
+
+force_inline cb_function F32 f32_ceil(F32 x) {
+  return __builtin_ceilf(x);
+}
+
+force_inline cb_function F32 f32_sqrt(F32 x) {
+  return (x);
 }
 
 #endif
@@ -649,7 +664,6 @@ cb_function Core_File_Async_State     core_file_write_async     (Core_File *file
 
 // ------------------------------------------------------------
 // #-- Runtime Assertion
-
 #if BUILD_ASSERT
 # define Assert_Preamble "ASSERT (" __FILE__ ":" Macro_Stringize(__LINE__) "): "
 

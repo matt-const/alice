@@ -1,108 +1,79 @@
 #!/bin/bash
 # (C) Copyright 2025 Matyas Constans
 # Licensed under the MIT License (https://opensource.org/license/mit/)
+echo "build started."
 
-if [[ "$(uname)" == "Linux" ]]; then
- 
+# NOTE(cmat): Exit on error.
+set -eu
 
-  # ------------------------------------------------------------
-  # #-- Compile Shaders
-  
-  echo "compiling shaders..."
-  pushd src/render/render_shader/ > /dev/null
-  ./compile_opengl4.sh
-  popd > /dev/null
+# NOTE(cmat): Set working directory to the build.sh folder.
+cd "$(dirname "$0")"
 
-  # ------------------------------------------------------------
-  # #-- Compile Program
+# NOTE(cmat): Absolute path for source files (compiler errors are cleaner).
+source_folder=$(realpath "./src")
 
-  echo "compiling program..."
-  mkdir -p build
-  pushd build > /dev/null
-  code_path=$(realpath "../src/")
- 
-  # NOTE(cmat): Compiler arguments.
-  compiler="
-  -O0 -g -fsanitize=address -fsanitize=undefined -fsanitize-address-use-after-scope
-  -fno-omit-frame-pointer
-  -I${code_path}
-  "
+# NOTE(cmat): Compilation parameters.
+build_folder="build"
 
-  # NOTE(cmat): Linker arguments.
-  libraries="-o test
-  -lGL
-  -lX11
-  -lXrandr
-  "
+include_folders="-I${source_folder}"
+define_flags="-DBUILD_DEBUG=1 -DBUILD_ASSERT=1"
 
-  # NOTE(cmat): Build flags.
-  defines="
-  -DBUILD_DEBUG=1
-  -DBUILD_ASSERT=1
-  "
+compiler_exec=""
+source_files=""
+compiler_flags=""
+linker_flags=""
 
-  # NOTE(cmat): Translation units.
-  source="
-  ${code_path}/entry.c
-  "
+# NOTE(cmat): Entry point.
+source_files+=" ${source_folder}/entry.c"
 
-  # NOTE(cmat): Compile & Link
-  clang $compiler $defines $source $libraries 
+# ------------------------------------------------------------
+# -- Clean build
+rm -rf   $build_folder
+mkdir -p $build_folder
 
-  popd > /dev/null
+# ------------------------------------------------------------
+# -- WASM build path
 
-elif [[ "$(uname)" == "Darwin" ]]; then
+# NOTE(cmat): 1 Megabyte
+wasm_stack_size=$[1 * 1024 * 1024]
 
-  # ------------------------------------------------------------
-  # #-- Compile Shaders
+compiler_exec+="clang"
 
-  echo "compiling shaders..."
-  pushd src/render/render_shader/ > /dev/null
-  ./compile_metal.sh
-  popd > /dev/null
+# compiler_flags+=" -fsanitize=address"
+# compiler_flags+=" -fsanitize=undefined"
+# compiler_flags+=" -fsanitize-address-use-after-scope"
+# compiler_flags+=" -fno-omit-frame-pointer"
+compiler_flags+=" -O0"
+compiler_flags+=" -g"
 
-  # ------------------------------------------------------------
-  # #-- Compile Program
 
-  echo "compiling program..."
-  mkdir -p build
-  pushd build > /dev/null
-  code_path=$(realpath "../src/")
+compiler_flags+=" --target=wasm32"
+compiler_flags+=" -nostdlib"
+compiler_flags+=" -msimd128"
 
-  # NOTE(cmat): Compiler arguments.
-  compiler="
-  -O0 -g -x objective-c
-  -fsanitize=address -fsanitize=undefined -fsanitize-address-use-after-scope
-  -fno-omit-frame-pointer
-  -I${code_path}
-  -I${code_path}/thirdparty/freetype/include
-  -L${code_path}/thirdparty/freetype/lib/macos
-  "
+linker_flags+=" -flto"
+linker_flags+=" -Wl,--export-table"
+linker_flags+=" -Wl,--lto-O3"
+linker_flags+=" -Wl,-z,stack-size=${wasm_stack_size}"
+linker_flags+=" -Wl,--no-entry"
+linker_flags+=" -Wl,-allow-undefined"
+linker_flags+=" -o alice_canvas.wasm"
+linker_flags+=" -Wl,--export=wasm_entry_point"
 
-  # NOTE(cmat): Linker arguments.
-  libraries="
-      -framework Foundation
-      -framework AppKit
-      -framework QuartzCore
-      -framework Metal
-      -lfreetype
-      -o test"
+# NOTE(cmat): Copy required resources to build folder.
+cp "${source_folder}/web/index.html"      "${build_folder}/"
+cp "${source_folder}/web/alice_canvas.js" "${build_folder}/"
 
-  # NOTE(cmat): Build flags.
-  defines="
-  -DBUILD_DEBUG=1
-  -DBUILD_ASSERT=1
-  "
+# NOTE(cmat): Compile with walloc.c
+# TODO(cmat): We want to remove this dependency as soon as possible.
+source_files+=" ${source_folder}/thirdparty/walloc.c"
 
-  # NOTE(cmat): Translation units.
-  source="
-  ${code_path}/entry.c
-  "
+# ------------------------------------------------------------
+# Invoke compiler
+pushd build > /dev/null 2>&1
 
-  # NOTE(cmat): Compile & Link
-  clang $compiler $defines $source $libraries 
+$compiler_exec $source_files $define_flags $include_folders $compiler_flags $linker_flags
 
-  popd > /dev/null
+popd > /dev/null 2>&1
 
-fi
-
+echo "build successful!"

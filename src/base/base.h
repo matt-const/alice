@@ -697,6 +697,10 @@ force_inline cb_function V2U v2u       (U32 x, U32 y)                  { return 
 force_inline cb_function V3U v3u       (U32 x, U32 y, U32 z)           { return (V3U) { x, y, z };    }
 force_inline cb_function V4U v4u       (U32 x, U32 y, U32 z, U32 w)    { return (V4U) { x, y, z, w }; }
 
+force_inline cb_function V2_U16 v2_u16 (U16 x, U16 y)                  { return (V2_U16) { x, y };       }
+force_inline cb_function V3_U16 v3_u16 (U16 x, U16 y, U16 z)           { return (V3_U16) { x, y, z };    }
+force_inline cb_function V4_U16 v4_u16 (U16 x, U16 y, U16 z, U16 w)    { return (V4_U16) { x, y, z, w }; }
+
 force_inline cb_function V2F v2f_f32   (F32 x) { return (V2F) { x, x };       }
 force_inline cb_function V3F v3f_f32   (F32 x) { return (V3F) { x, x, x };    }
 force_inline cb_function V4F v4f_f32   (F32 x) { return (V4F) { x, x, x, x }; }

@@ -27,6 +27,10 @@
 
 # include <linux/io_uring.h>
 
-#include "core_linux.c"
+# include "core_linux.c"
+
+#elif OS_WASM
+
+# include "core_wasm.c"
 
 #endif

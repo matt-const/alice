@@ -3,7 +3,7 @@
 
 cb_function void test_base_allocation(void) {
   Random_Seed rng = 0x0C0FEFE;
-  
+ 
   Arena_Flag flag_combinations[2] = {
     Arena_Flag_Allow_Chaining,
     Arena_Flag_Allow_Chaining | Arena_Flag_Backtrack_Before_Chaining
@@ -26,7 +26,7 @@ cb_function void test_base_allocation(void) {
         For_I32(alloc_it, 10) {
             U64 random_bytes = 0;
             switch (u64_random(&rng, 1, 3)) {
-              case 1: { random_bytes = u64_random(&rng, 10, u64_megabytes(120));  } break;
+              case 1: { random_bytes = u64_random(&rng, 10, u64_megabytes(128));  } break;
               case 2: { random_bytes = u64_random(&rng, 1,  u64_kilobytes(1));    } break;
               case 3: { random_bytes = u64_random(&rng, 1, 7);                    } break;
               Invalid_Default;
