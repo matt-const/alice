@@ -3,6 +3,8 @@
 # Licensed under the MIT License (https://opensource.org/license/mit/)
 echo "build started."
 
+debug=""
+
 # NOTE(cmat): Exit on error.
 set -eu
 
@@ -16,7 +18,14 @@ source_folder=$(realpath "./src")
 build_folder="build"
 
 include_folders="-I${source_folder}"
-define_flags="-DBUILD_DEBUG=1 -DBUILD_ASSERT=1"
+
+define_flags=""
+
+if [[ -v debug ]]; then
+define_flags+=" -DBUILD_DEBUG=1 -DBUILD_ASSERT=1"
+else
+define_flags+=" -DBUILD_DEBUG=0 -DBUILD_ASSERT=0"
+fi
 
 compiler_exec=""
 source_files=""
@@ -43,8 +52,22 @@ compiler_exec+="clang"
 # compiler_flags+=" -fsanitize=undefined"
 # compiler_flags+=" -fsanitize-address-use-after-scope"
 # compiler_flags+=" -fno-omit-frame-pointer"
+
+if [[ -v debug ]]; then
 compiler_flags+=" -O0"
 compiler_flags+=" -g"
+
+else
+compiler_flags+=" -O3"
+
+# TODO(cmat): strlen optimizations are probably significant enough
+# that we want to roll our own strlen
+
+# NOTE(cmat): Clang will insert strlen calls, which calls into the CRT,
+# which we have disabled.
+
+compiler_flags+=" -fno-builtin-strlen"
+fi
 
 
 compiler_flags+=" --target=wasm32"

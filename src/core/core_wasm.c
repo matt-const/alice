@@ -84,11 +84,9 @@ cb_function void core_memory_uncommit (void *virtual_base, U64 bytes)           
 // #-- WASM entry point.
 
 __attribute__((export_name("wasm_entry_point")))
-void wasm_entry_point(void) {
-  char *cpu_name = "WASM CPU";
-
-  wasm_context.cpu_name           = str(8, (I08 *)cpu_name);
-  wasm_context.cpu_logical_cores  = 1;
+void wasm_entry_point(U32 cpu_logical_cores) {
+  wasm_context.cpu_name           = str_lit("WASM VM");
+  wasm_context.cpu_logical_cores  = cpu_logical_cores;
   wasm_context.mmu_page_bytes     = u64_kilobytes(64);
   wasm_context.ram_capacity_bytes = u64_gigabytes(4);
 

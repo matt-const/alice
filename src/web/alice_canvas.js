@@ -2,8 +2,7 @@ const wasm_context = {
   canvas:         null,
   memory:         null,
   export_table:   null,
-  webgpu_context: null,
-  webgpu_device:  null,
+  webgpu:         null,
 };
 
 function js_string_from_c_string(string_len, string_txt) {
@@ -68,17 +67,115 @@ async function webgpu_init(canvas) {
     alphaMode: 'opaque'
   });
 
+  webgpu_handle_map = {
+    next_user_handle: 1,
+    map:              new Map(),
+
+    store(webgpu_handle) {
+      const user_handle = this.next_user_handle++;
+      this.map.set(user_handle, webgpu_handle);
+      return user_handle;
+    },
+
+    get(user_handle)     { return this.map.get(user_handle); },
+    remove(user_handle)  { this.map.delete(user_handle);     }
+  };
+
   return {
-    device:   webgpu_device,
-    context:  webgpu_context
+    device:             webgpu_device,
+    context:            webgpu_context,
+    handle_map:         webgpu_handle_map,
+    backbuffer_format:  webgpu_format,
   };
 }
 
+function webgpu_buffer_allocate(bytes) {
+  const buffer = wasm_context.webgpu.device.createBuffer({
+    size:   bytes,
+    usage:  GPUBufferUsage.VERTEX   |
+            GPUBufferUsage.INDEX    | 
+            GPUBufferUsage.STORAGE  |
+            GPUBufferUsage.COPY_DST,
+  });
+
+  return wasm_context.webgpu.handle_map.store(buffer)
+}
+
+function webgpu_buffer_download(buffer_handle, offset, bytes, data) {
+  buffer = wasm_context.webgpu.handle_map.get(buffer_handle);
+  wasm_context.webgpu.device.queue.writeBuffer(buffer, offset, data, 0, bytes);
+}
+
+function webgpu_buffer_destroy(buffer_handle) {
+  buffer = wasm_context.webgpu.handle_map.get(buffer_handle);
+  wasm_context.webgpu.handle_map.remove(buffer_handle);
+
+  buffer.destroy();
+}
+
+function webgpu_shader_create(shader_code) {
+  shader = wasm_context.webgpu.device.createShaderModule({ code: shader_code });
+  return wasm_context.webgpu.handle_map.store(shader);
+}
+
+vertex_buffer   = null;
+shader_flat_2D  = null;
+pipeline_flat2D = null;
+
+function webgpu_setup() {
+  const vertices = new Float32Array([
+     0.0,  0.5,
+    -0.5, -0.5,
+     0.5, -0.5
+  ]);
+
+  vertex_buffer = webgpu_buffer_allocate(vertices.byteLength);
+  webgpu_buffer_download(vertex_buffer, 0, vertices.byteLength, vertices.buffer);
+
+  shader_code = `
+  @vertex
+  fn vs_main(@location(0) pos : vec2<f32>) -> @builtin(position) vec4<f32> {
+    return vec4<f32>(pos, 0.0, 1.0);
+  }
+
+  @fragment
+  fn fs_main() -> @location(0) vec4<f32> {
+    return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+  }`;
+
+  shader_flat_2D = webgpu_shader_create(shader_code);
+
+  pipeline = wasm_context.webgpu.device.createRenderPipeline({
+    layout: 'auto',
+    
+    vertex: {
+      module: wasm_context.webgpu.handle_map.get(shader_flat_2D),
+      entryPoint: 'vs_main',
+      buffers: [
+        {
+          arrayStride: 8,
+          attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }]
+        }
+      ]
+    },
+
+    fragment: {
+      module: wasm_context.webgpu.handle_map.get(shader_flat_2D),
+      entryPoint: 'fs_main',
+      targets: [{ format: wasm_context.webgpu.backbuffer_format }]
+    },
+
+    primitive: { topology: 'triangle-list' }
+  });
+}
+
 function webgpu_frame_flush() {
-  const command_encoder = wasm_context.webgpu_device.createCommandEncoder();
+  const command_encoder = wasm_context.webgpu.device.createCommandEncoder();
+
+  const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();
   const render_pass_descriptor = {
     colorAttachments: [{
-      view: wasm_context.webgpu_context.getCurrentTexture().createView(),
+      view: backbuffer_texture_view,
       clearValue: { r:0, g:0, b:1, a:1 },
       loadOp: 'clear',
       storeOp: 'store'
@@ -86,15 +183,21 @@ function webgpu_frame_flush() {
   };
 
   const pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
+
+  pass_encoder.setPipeline(pipeline);
+  pass_encoder.setVertexBuffer(0, wasm_context.webgpu.handle_map.get(vertex_buffer));
+  pass_encoder.draw(3, 1, 0, 0);
+
   pass_encoder.end();
 
-  wasm_context.webgpu_device.queue.submit([command_encoder.finish()]);
+  wasm_context.webgpu.device.queue.submit([command_encoder.finish()]);
 }
 
 function canvas_next_frame() {
-  requestAnimationFrame(canvas_next_frame);
   wasm_context.export_table.wasm_next_frame();
   webgpu_frame_flush();
+
+  requestAnimationFrame(canvas_next_frame);
 }
 
 function window_resolution_pixels() {
@@ -105,7 +208,6 @@ function window_resolution_pixels() {
 }
 
 function wasm_module_load(wasm_bytecode) {
-
   const memory = new WebAssembly.Memory({
     initial: 256,   // NOTE(cmat): 16 Megabytes
     maximum: 65536, // NOTE(cmat): 4 Gigabytes.
@@ -122,37 +224,38 @@ function wasm_module_load(wasm_bytecode) {
     }
   };
 
-  WebAssembly.instantiate(wasm_bytecode, import_table)
-    .then(wasm => {
-      wasm_context.memory       = wasm.instance.exports.memory;
-      wasm_context.export_table = wasm.instance.exports;
-      wasm_context.canvas       = document.getElementById("alice_canvas");
+  WebAssembly.instantiate(wasm_bytecode, import_table).then(wasm => {
+    wasm_context.memory       = wasm.instance.exports.memory;
+    wasm_context.export_table = wasm.instance.exports;
+    wasm_context.canvas       = document.getElementById("alice_canvas");
+    
+    webgpu_init(wasm_context.canvas).then(webgpu => {
+      wasm_context.webgpu = webgpu;
       
-      webgpu_init(wasm_context.canvas).then(webgpu => {
-        wasm_context.webgpu_device  = webgpu.device;
-        wasm_context.webgpu_context = webgpu.context;
+      webgpu_setup();
 
-        const resolution            = window_resolution_pixels();
-        wasm_context.canvas.width   = resolution[0];
-        wasm_context.canvas.height  = resolution[1];
+      const resolution            = window_resolution_pixels();
+      wasm_context.canvas.width   = resolution[0];
+      wasm_context.canvas.height  = resolution[1];
 
-        // NOTE(cmat): Dynamically modify canvas resolution.
-        window.addEventListener('resize', () => {
-          const resolution = window_resolution_pixels();
-          wasm_context.canvas.width  = resolution[0];
-          wasm_context.canvas.height = resolution[1];
-        });
-
-        // NOTE(cmat): Disable context menu on canvas.
-        wasm_context.canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-        // NOTE(cmat): Call into entry point.
-        wasm_context.export_table.wasm_entry_point();
-
-        // NOTE(cmat): Start animation frame requests
-        canvas_next_frame();
+      // NOTE(cmat): Dynamically modify canvas resolution.
+      window.addEventListener('resize', () => {
+        const resolution = window_resolution_pixels();
+        wasm_context.canvas.width  = resolution[0];
+        wasm_context.canvas.height = resolution[1];
       });
+
+      // NOTE(cmat): Disable context menu on canvas.
+      wasm_context.canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+      // NOTE(cmat): Call into entry point
+      const cpu_logical_cores = navigator.hardwareConcurrency;
+      wasm_context.export_table.wasm_entry_point(cpu_logical_cores);
+
+      // NOTE(cmat): Start animation frame requests
+      canvas_next_frame();
     });
+  });
 }
 
 // NOTE(cmat): Load WASM module.
