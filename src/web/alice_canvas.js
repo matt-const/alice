@@ -129,7 +129,7 @@ texture_white          = null;
 sampler_linear         = null;
 buffer_NDC_from_screen = null;
 
-const vertices        = new ArrayBuffer(20 * 3);
+const vertices        = new ArrayBuffer(20 * 4);
 const vertices_view   = new DataView(vertices);
 
 function vertex_push(idx, x, y, u, v, packed_color) {
@@ -194,12 +194,19 @@ function webgpu_setup() {
     minFilter: 'linear',
   });
 
-  vertex_push(0,  0.0,  0.5, 0.0, 0.0, 0xFFFF0000);
-  vertex_push(1, -0.5, -0.5, 1.0, 0.0, 0xFF00FF00);
-  vertex_push(2,  0.5, -0.5, 0.5, 1.0, 0xFF0000FF);
+  vertex_push(0, -0.5, -0.5, 0.0, 0.0, 0xFFFF0000);
+  vertex_push(1,  0.5, -0.5, 1.0, 0.0, 0xFF00FF00);
+  vertex_push(2,  0.5,  0.5, 0.5, 1.0, 0xFF0000FF);
+  vertex_push(3, -0.5,  0.5, 0.5, 1.0, 0xFF0000FF);
 
   vertex_buffer = webgpu_buffer_allocate(vertices.byteLength);
   webgpu_buffer_download(vertex_buffer, 0, vertices.byteLength, vertices);
+
+  index_data = new Int32Array([ 0, 1, 2, 0, 2, 3 ]);
+  index_view = new Uint8Array(index_data.buffer, index_data.byteOffset, index_data.byteLength);
+
+  index_buffer = webgpu_buffer_allocate(index_view.byteLength);
+  webgpu_buffer_download(index_buffer, 0, index_view.byteLength, index_view);
 
   shader_code = `
 
@@ -351,12 +358,13 @@ function webgpu_frame_flush() {
 
   // NOTE(cmat): Viewport.
   pass_encoder.setViewport(0, 0, wasm_context.canvas.width, wasm_context.canvas.height, 0.0, 1.0);
-  pass_encoder.setScissorRect(0, 0, wasm_context.canvas.width / 2, wasm_context.canvas.height);
+  // pass_encoder.setScissorRect(0, 0, wasm_context.canvas.width / 2, wasm_context.canvas.height);
 
   pass_encoder.setPipeline(pipeline);
   pass_encoder.setBindGroup(0, bindgroup_flat_2D);
   pass_encoder.setVertexBuffer(0, wasm_context.webgpu.handle_map.get(vertex_buffer));
-  pass_encoder.draw(3, 1, 0, 0);
+  pass_encoder.setIndexBuffer(wasm_context.webgpu.handle_map.get(index_buffer), "uint32");
+  pass_encoder.drawIndexed(6, 1, 0, 0, 0);
 
   pass_encoder.end();
 
