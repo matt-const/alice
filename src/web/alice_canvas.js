@@ -58,13 +58,14 @@ async function webgpu_init(canvas) {
   }
 
   const webgpu_device  = await webgpu_adapter.requestDevice();
+
   const webgpu_context = wasm_context.canvas.getContext("webgpu");
   const webgpu_format  = navigator.gpu.getPreferredCanvasFormat();
 
   webgpu_context.configure({
     device: webgpu_device,
     format: webgpu_format,
-    alphaMode: 'opaque'
+    alphaMode: 'premultiplied'
   });
 
   webgpu_handle_map = {
@@ -95,6 +96,7 @@ function webgpu_buffer_allocate(bytes) {
     usage:  GPUBufferUsage.VERTEX   |
             GPUBufferUsage.INDEX    | 
             GPUBufferUsage.STORAGE  |
+            GPUBufferUsage.UNIFORM  |
             GPUBufferUsage.COPY_DST,
   });
 
@@ -118,43 +120,187 @@ function webgpu_shader_create(shader_code) {
   return wasm_context.webgpu.handle_map.store(shader);
 }
 
-vertex_buffer   = null;
-shader_flat_2D  = null;
-pipeline_flat2D = null;
+vertex_buffer          = null;
+index_buffer           = null;
+shader_flat_2D         = null;
+pipeline_flat2D        = null;
+bindgroup_flat2D       = null;
+texture_white          = null;
+sampler_linear         = null;
+buffer_NDC_from_screen = null;
+
+const vertices        = new ArrayBuffer(20 * 3);
+const vertices_view   = new DataView(vertices);
+
+function vertex_push(idx, x, y, u, v, packed_color) {
+  let off = idx * 20;
+  vertices_view.setFloat32 (off + 0,  x,            true);
+  vertices_view.setFloat32 (off + 4,  y,            true);
+  vertices_view.setFloat32 (off + 8,  u,            true);
+  vertices_view.setFloat32 (off + 12, v,            true);
+  vertices_view.setUint32  (off + 16, packed_color, true);
+}
 
 function webgpu_setup() {
-  const vertices = new Float32Array([
-     0.0,  0.5,
-    -0.5, -0.5,
-     0.5, -0.5
+
+  identity_data = new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
   ]);
 
+  identity_buffer = new Uint8Array(identity_data.buffer, identity_data.byteOffset, identity_data.byteLength);
+
+  buffer_NDC_from_screen = webgpu_buffer_allocate(256);
+  webgpu_buffer_download(buffer_NDC_from_screen, 0, identity_buffer.byteLength, identity_buffer);
+
+  texture_white = wasm_context.webgpu.device.createTexture({
+    size: [ 2, 2 ],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+
+  const white_pixels = new Uint8Array(2 * 2 * 4);
+  white_pixels[0]  = 255;
+  white_pixels[1]  = 0;
+  white_pixels[2]  = 0;
+  white_pixels[3]  = 255;
+
+  white_pixels[4]  = 0;
+  white_pixels[5]  = 255;
+  white_pixels[6]  = 0;
+  white_pixels[7]  = 255;
+
+  white_pixels[8]  = 0;
+  white_pixels[9]  = 0;
+  white_pixels[10] = 255;
+  white_pixels[11] = 255;
+
+  white_pixels[12] = 255;
+  white_pixels[13] = 255;
+  white_pixels[14] = 255;
+  white_pixels[15] = 255;
+
+  wasm_context.webgpu.device.queue.writeTexture(
+    { texture: texture_white, },
+    white_pixels,
+    { bytesPerRow: 2 * 4, rowsPerImage: 2, },
+    { width: 2, height: 2, depthOrArrayLayers: 1, }
+  );
+
+  sampler_linear = wasm_context.webgpu.device.createSampler({
+    magFilter: 'linear',
+    minFilter: 'linear',
+  });
+
+  vertex_push(0,  0.0,  0.5, 0.0, 0.0, 0xFFFF0000);
+  vertex_push(1, -0.5, -0.5, 1.0, 0.0, 0xFF00FF00);
+  vertex_push(2,  0.5, -0.5, 0.5, 1.0, 0xFF0000FF);
+
   vertex_buffer = webgpu_buffer_allocate(vertices.byteLength);
-  webgpu_buffer_download(vertex_buffer, 0, vertices.byteLength, vertices.buffer);
+  webgpu_buffer_download(vertex_buffer, 0, vertices.byteLength, vertices);
 
   shader_code = `
+
+  @group(0) @binding(0)
+  var Texture : texture_2d<f32>;
+  
+  @group(0) @binding(1)
+  var Sampler : sampler;
+
+  @group(0) @binding(2)
+  var<uniform> NDC_From_Screen : mat4x4<f32>;
+
+  fn vec4_unpack_u32(packed: u32) -> vec4<f32> {
+    let r = f32((packed >> 0)  & 0xFFu) / 255.0;
+    let g = f32((packed >> 8)  & 0xFFu) / 255.0;
+    let b = f32((packed >> 16) & 0xFFu) / 255.0;
+    let a = f32((packed >> 24) & 0xFFu) / 255.0;
+    
+    return vec4<f32>(r, g, b, a);
+  }
+
+  struct VS_Out {
+    @builtin(position)  X : vec4<f32>,
+    @location(0)        C : vec4<f32>,
+    @location(1)        U : vec2<f32>,
+  };
+
   @vertex
-  fn vs_main(@location(0) pos : vec2<f32>) -> @builtin(position) vec4<f32> {
-    return vec4<f32>(pos, 0.0, 1.0);
+  fn vs_main(@location(0) X : vec2<f32>,
+             @location(1) U : vec2<f32>,
+             @location(2) C : u32) -> VS_Out {
+
+    var out : VS_Out;
+
+    out.X = NDC_From_Screen * vec4<f32>(X, 0.0, 1.0);
+    out.C = vec4_unpack_u32(C);
+    out.U = U;
+
+    return out;
   }
 
   @fragment
-  fn fs_main() -> @location(0) vec4<f32> {
-    return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+  fn fs_main(@location(0) C : vec4<f32>,
+             @location(1) U : vec2<f32> ) -> @location(0) vec4<f32> {
+
+    let color_texture = textureSample(Texture, Sampler, U);
+    let color =  color_texture * C;
+    return color;
   }`;
 
   shader_flat_2D = webgpu_shader_create(shader_code);
 
+  pipeline_layout = wasm_context.webgpu.device.createPipelineLayout({
+    bindGroupLayouts: [
+      wasm_context.webgpu.device.createBindGroupLayout({
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {
+              sampleType: 'float',
+              viewDimension: '2d'
+            },
+
+          },
+
+          {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: {
+              type: 'filtering'
+            },
+          },
+
+          {
+            binding: 2,
+            visibility: GPUShaderStage.VERTEX,
+            buffer: {
+              type: 'uniform'
+            },
+          }
+
+        ]
+      })
+    ]
+  });
+
   pipeline = wasm_context.webgpu.device.createRenderPipeline({
-    layout: 'auto',
+    layout: pipeline_layout,
     
     vertex: {
       module: wasm_context.webgpu.handle_map.get(shader_flat_2D),
       entryPoint: 'vs_main',
       buffers: [
         {
-          arrayStride: 8,
-          attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }]
+          arrayStride: 20,
+          attributes: [
+            { shaderLocation: 0, offset: 0,   format: 'float32x2' }, // X
+            { shaderLocation: 1, offset: 8,   format: 'float32x2' }, // U
+            { shaderLocation: 2, offset: 16,  format: 'uint32'    }, // C
+          ]
         }
       ]
     },
@@ -162,11 +308,30 @@ function webgpu_setup() {
     fragment: {
       module: wasm_context.webgpu.handle_map.get(shader_flat_2D),
       entryPoint: 'fs_main',
-      targets: [{ format: wasm_context.webgpu.backbuffer_format }]
+      targets: [
+        {
+          format: wasm_context.webgpu.backbuffer_format,
+          blend: {
+            color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+          }
+        },
+      ]
     },
 
     primitive: { topology: 'triangle-list' }
   });
+
+  bindgroup_flat_2D = wasm_context.webgpu.device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [ 
+      { binding: 0, resource: texture_white.createView(), },
+      { binding: 1, resource: sampler_linear, },
+      { binding: 2, resource: { buffer: wasm_context.webgpu.handle_map.get(buffer_NDC_from_screen) }, },
+    ]
+  });
+
+
 }
 
 function webgpu_frame_flush() {
@@ -176,7 +341,7 @@ function webgpu_frame_flush() {
   const render_pass_descriptor = {
     colorAttachments: [{
       view: backbuffer_texture_view,
-      clearValue: { r:0, g:0, b:1, a:1 },
+      clearValue: { r:0, g:0, b:0, a:1 },
       loadOp: 'clear',
       storeOp: 'store'
     }]
@@ -184,7 +349,12 @@ function webgpu_frame_flush() {
 
   const pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
 
+  // NOTE(cmat): Viewport.
+  pass_encoder.setViewport(0, 0, wasm_context.canvas.width, wasm_context.canvas.height, 0.0, 1.0);
+  pass_encoder.setScissorRect(0, 0, wasm_context.canvas.width / 2, wasm_context.canvas.height);
+
   pass_encoder.setPipeline(pipeline);
+  pass_encoder.setBindGroup(0, bindgroup_flat_2D);
   pass_encoder.setVertexBuffer(0, wasm_context.webgpu.handle_map.get(vertex_buffer));
   pass_encoder.draw(3, 1, 0, 0);
 

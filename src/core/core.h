@@ -564,7 +564,7 @@ force_inline cb_function F32 f32_ceil(F32 x) {
 }
 
 force_inline cb_function F32 f32_sqrt(F32 x) {
-  return (x);
+  return __builtin_sqrtf(x);
 }
 
 #endif
