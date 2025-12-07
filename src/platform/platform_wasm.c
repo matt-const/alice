@@ -1,7 +1,27 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
+
 // ------------------------------------------------------------
+// #-- JS - WASM platform API.
+extern void js_platform_set_shared_memory(U32 frame_state);
+
+#pragma pack(push, 1)
+
+cb_global struct {
+  U32 display_resolution_width;
+  U32 display_resolution_height;
+
+  U32 mouse_position_x;
+  U32 mouse_position_y;
+  U32 mouse_button_left;
+  U32 mouse_button_right;
+  U32 mouse_button_middle;
+
+} WASM_Shared_Frame_State = { };
+
+#pragma pack(pop)
+
 
 cb_global struct {
   // TODO(cmat): Having doubts, I think first frame should be userland instead.
@@ -26,12 +46,35 @@ cb_function Platform_Frame_State *platform_frame_state(void) {
   return &WASM_Platform_State.frame_state;
 }
 
+cb_function void wasm_update_input(Platform_Input *input) {
+  V2F new_position          = v2f((F32)WASM_Shared_Frame_State.mouse_position_x, (F32)WASM_Shared_Frame_State.mouse_position_y);
+  input->mouse.position_dt  = v2f_sub(new_position, input->mouse.position);
+  input->mouse.position     = new_position;
+
+  input->mouse.left.down_first_frame    = WASM_Shared_Frame_State.mouse_button_left && !input->mouse.left.down;
+  input->mouse.right.down_first_frame   = WASM_Shared_Frame_State.mouse_button_right && !input->mouse.right.down;
+  input->mouse.middle.down_first_frame  = WASM_Shared_Frame_State.mouse_button_middle && !input->mouse.middle.down;
+
+  input->mouse.left.down    = WASM_Shared_Frame_State.mouse_button_left;
+  input->mouse.right.down   = WASM_Shared_Frame_State.mouse_button_right;
+  input->mouse.middle.down  = WASM_Shared_Frame_State.mouse_button_left;
+}
+
+cb_function void wasm_update_frame_state(Platform_Frame_State *state) {
+  state->display.frame_index += 1;
+  state->display.resolution   = v2f(WASM_Shared_Frame_State.display_resolution_width, WASM_Shared_Frame_State.display_resolution_height);
+
+  wasm_update_input(&state->input);
+}
+
 __attribute__((export_name("wasm_next_frame")))
 void wasm_next_frame(void) {
 
   Platform_Render_Context render_context = {
     .backend = Platform_Render_Backend_WebGPU
   };
+
+  wasm_update_frame_state(&WASM_Platform_State.frame_state);
 
   cb_local_persist B32 first_frame = 1;
   WASM_Platform_State.next_frame(first_frame, &render_context);
@@ -46,4 +89,7 @@ cb_function void base_entry_point(Array_Str command_line) {
   zero_fill(&WASM_Platform_State);
   WASM_Platform_State.first_frame = 1;
   WASM_Platform_State.next_frame  = boot.next_frame;
+
+  zero_fill(&WASM_Shared_Frame_State);
+  js_platform_set_shared_memory((U32)&WASM_Shared_Frame_State);
 }

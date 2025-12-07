@@ -14,4 +14,7 @@
 # include "render_opengl_corearb.c"
 # include "render_opengl4.c"
 
+#elif OS_WASM
+# include "render_webgpu.c"
+
 #endif

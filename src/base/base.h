@@ -705,9 +705,9 @@ force_inline cb_function V2F v2f_f32   (F32 x) { return (V2F) { x, x };       }
 force_inline cb_function V3F v3f_f32   (F32 x) { return (V3F) { x, x, x };    }
 force_inline cb_function V4F v4f_f32   (F32 x) { return (V4F) { x, x, x, x }; }
 
-force_inline cb_function V2I v2i_f32   (I32 x) { return (V2I) { x, x };       }
-force_inline cb_function V3I v3i_f32   (I32 x) { return (V3I) { x, x, x };    }
-force_inline cb_function V4I v4i_f32   (I32 x) { return (V4I) { x, x, x, x }; }
+force_inline cb_function V2I v2i_s     (I32 x) { return (V2I) { x, x };       }
+force_inline cb_function V3I v3i_s     (I32 x) { return (V3I) { x, x, x };    }
+force_inline cb_function V4I v4i_s     (I32 x) { return (V4I) { x, x, x, x }; }
 
 // NOTE(cmat): 2D
 inline cb_function V2F v2f_add           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x + rhs.x, lhs.y + rhs.y }; }
@@ -1003,6 +1003,8 @@ Assert_Compiler(sizeof(M4_F64) == 4 * 4 * sizeof(F64));
 // ------------------------------------------------------------
 // #-- Region Types
 
+#pragma pack(push, 1)
+
 typedef union Region2_I32 {
   struct { I32 x0, y0, x1, y1; };
   struct { V2I min, max;       };
@@ -1032,6 +1034,8 @@ typedef union Region3_F64 {
   struct { F64 x0, y0, z0, x1, y1, z1;  };
   struct { V3F min, max;                };
 } Region3_F64;
+
+#pragma pack(pop)
 
 Assert_Compiler(sizeof(Region2_I32) == 4 * sizeof(I32));
 Assert_Compiler(sizeof(Region2_F32) == 4 * sizeof(F32));

@@ -3,7 +3,7 @@
 # Licensed under the MIT License (https://opensource.org/license/mit/)
 echo "build started."
 
-debug=""
+debug=1
 
 # NOTE(cmat): Exit on error.
 set -eu
@@ -66,8 +66,9 @@ compiler_flags+=" -O3"
 # NOTE(cmat): Clang will insert strlen calls, which calls into the CRT,
 # which we have disabled.
 
-compiler_flags+=" -fno-builtin-strlen"
 fi
+
+compiler_flags+=" -fno-builtin-strlen"
 
 
 compiler_flags+=" --target=wasm32"

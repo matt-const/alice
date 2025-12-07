@@ -3,8 +3,9 @@
 
 // ------------------------------------------------------------
 // #-- Render Resources
+#define R_Resource_None 0
 
-typedef struct R_Resource { U64 id; } R_Resource;
+typedef U32 R_Resource;
 
 typedef R_Resource R_Shader;
 typedef R_Resource R_Buffer;
@@ -32,9 +33,9 @@ typedef struct R_Buffer_Info {
 } R_Buffer_Info;
 
 cb_function R_Buffer        r_buffer_allocate (U64 capacity, R_Buffer_Mode mode);
-cb_function void            r_buffer_download (R_Buffer *buffer, U64 offset, U64 bytes, void *data);
+cb_function void            r_buffer_download (R_Buffer buffer, U64 offset, U64 bytes, void *data);
+cb_function R_Buffer_Info   r_buffer_info     (R_Buffer buffer);
 cb_function void            r_buffer_destroy  (R_Buffer *buffer);
-cb_function R_Buffer_Info   r_buffer_info     (R_Buffer *buffer);
 
 typedef U32 R_Texture_Format;
 enum {
@@ -50,14 +51,23 @@ typedef struct {
   U32              height;
 } R_Texture_Config;
 
-cb_function R_Texture r_texture_allocate (R_Texture_Config *config);
-cb_function void      r_texture_download (R_Texture *texture, U08 *texture_data);
+cb_function R_Texture r_texture_allocate (R_Texture_Format format, U32 width, U32 height);
+cb_function void      r_texture_download (R_Texture texture, R_Texture_Format download_format, R2I region, void *data);
 cb_function void      r_texture_destroy  (R_Texture *texture);
 
-#define R_Vertex_Max_Attribute_Count 16
-#define R_Declare_Vertex_Attribute(type, x) alignas(16) type x
+typedef U32 R_Sampler_Filter;
+enum {
+  R_Sampler_Filter_Linear,
+  R_Sampler_Filter_Nearest,
+};
 
-typedef U08 R_Vertex_Attribute_Format;
+cb_function R_Sampler r_sampler_create   (R_Sampler_Filter mag_filter, R_Sampler_Filter min_filter);
+cb_function void      r_sampler_destroy  (R_Sampler *sampler);
+
+#define R_Vertex_Max_Attribute_Count 8
+#define R_Declare_Vertex_Attribute(type_, x_) alignas(16) type_ x_
+
+typedef U16 R_Vertex_Attribute_Format;
 enum {
   R_Vertex_Attribute_Format_F32,
   R_Vertex_Attribute_Format_V2_F32,
@@ -77,52 +87,53 @@ enum {
   R_Vertex_Attribute_Format_V4_U08_Normalized
 };
 
+#pragma pack(push, 1)
+
 typedef struct {
-  U16 offset;
+  U16                       offset;
   R_Vertex_Attribute_Format format;
 } R_Vertex_Attribute;
 
 typedef struct {
-  U16 stride;
-  U16 entry_count;
-  R_Vertex_Attribute entry_array[R_Vertex_Max_Attribute_Count];
+  U16                 stride;
+  U16                 entry_count;
+  R_Vertex_Attribute  entry_array[R_Vertex_Max_Attribute_Count];
 } R_Vertex_Format;
 
-cb_function R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format format);
+#pragma pack(pop)
+
+cb_function R_Pipeline r_pipeline_create  (R_Shader shader, R_Vertex_Format *format);
+cb_function void       r_pipeline_destroy (R_Pipeline *pipeline);
 
 typedef struct {
   R_Declare_Vertex_Attribute(V2F, X);
-  R_Declare_Vertex_Attribute(U32, C);
   R_Declare_Vertex_Attribute(V2F, U);
-  R_Declare_Vertex_Attribute(U32, Texture_Slot);
-} R_Vertex_XCU_2D;
+  R_Declare_Vertex_Attribute(U32, C);
+} R_Vertex_XUC_2D;
 
-cb_global R_Vertex_Format R_Vertex_Format_XCU_2D = {
-  .stride       = sizeof(R_Vertex_XCU_2D),
-  .entry_count  = 4,
+cb_global R_Vertex_Format R_Vertex_Format_XUC_2D = {
+  .stride       = sizeof(R_Vertex_XUC_2D),
+  .entry_count  = 3,
   .entry_array  = {
-    { .offset   = offsetof(R_Vertex_XCU_2D, X),            .format = R_Vertex_Attribute_Format_V2_F32            },
-    { .offset   = offsetof(R_Vertex_XCU_2D, C),            .format = R_Vertex_Attribute_Format_V4_U08_Normalized },
-    { .offset   = offsetof(R_Vertex_XCU_2D, U),            .format = R_Vertex_Attribute_Format_V2_F32            },
-    { .offset   = offsetof(R_Vertex_XCU_2D, Texture_Slot), .format = R_Vertex_Attribute_Format_U32               },
+    { .offset   = offsetof(R_Vertex_XUC_2D, X), .format = R_Vertex_Attribute_Format_V2_F32            },
+    { .offset   = offsetof(R_Vertex_XUC_2D, U), .format = R_Vertex_Attribute_Format_V2_F32            },
+    { .offset   = offsetof(R_Vertex_XUC_2D, C), .format = R_Vertex_Attribute_Format_V4_U08_Normalized },
   },
 };
 
 typedef struct {
   R_Declare_Vertex_Attribute(V3F, X);
-  R_Declare_Vertex_Attribute(U32, C);
   R_Declare_Vertex_Attribute(V2F, U);
-  R_Declare_Vertex_Attribute(U32, Texture_Slot);
-} R_Vertex_XCU_3D;
+  R_Declare_Vertex_Attribute(U32, C);
+} R_Vertex_XUC_3D;
 
-cb_global R_Vertex_Format R_Vertex_Format_XCU_3D = {
-  .stride       = sizeof(R_Vertex_XCU_3D),
-  .entry_count  = 4,
+cb_global R_Vertex_Format R_Vertex_Format_XUC_3D = {
+  .stride       = sizeof(R_Vertex_XUC_3D),
+  .entry_count  = 3,
   .entry_array  = {
-    { .offset   = offsetof(R_Vertex_XCU_3D, X),            .format = R_Vertex_Attribute_Format_V3_F32            },
-    { .offset   = offsetof(R_Vertex_XCU_3D, C),            .format = R_Vertex_Attribute_Format_V4_U08_Normalized },
-    { .offset   = offsetof(R_Vertex_XCU_3D, U),            .format = R_Vertex_Attribute_Format_V2_F32            },
-    { .offset   = offsetof(R_Vertex_XCU_3D, Texture_Slot), .format = R_Vertex_Attribute_Format_U32               },
+    { .offset   = offsetof(R_Vertex_XUC_3D, X), .format = R_Vertex_Attribute_Format_V3_F32            },
+    { .offset   = offsetof(R_Vertex_XUC_3D, U), .format = R_Vertex_Attribute_Format_V2_F32            },
+    { .offset   = offsetof(R_Vertex_XUC_3D, C), .format = R_Vertex_Attribute_Format_V4_U08_Normalized },
   },
 };
 
@@ -148,30 +159,35 @@ typedef struct {
 
 extern R_Command_Buffer R_Commands;
 
-#define R_Texture_Slots         16
-#define R_Max_Constant_Buffers  8
+#pragma pack(push, 1)
 
-typedef struct {
-  U32        index_count;
-  U32        index_buffer_offset;
-  U32        constant_buffer_count;
-  B32        depth_testing;
+typedef struct R_Command_Draw {
+
+  R_Buffer   constant_buffer;
   R_Buffer   vertex_buffer;
-  R_Buffer   index_buffer;  
+  R_Buffer   index_buffer;
   R_Pipeline pipeline;
-  R_Texture  texture_slots    [R_Texture_Slots];
+  R_Texture  texture;
   R_Sampler  sampler;
-  R_Buffer   constant_buffers [R_Max_Constant_Buffers];
-  R2I        clip_region;
-  R2I        viewport_region;
+
+  U32 draw_index_count;
+  U32 draw_index_offset;
+
+  B32 depth_test;
+
+  R2I draw_region;
+  R2I clip_region;
+
 } R_Command_Draw;
 
-cb_function void r_command_reset  (void);
+#pragma pack(pop)
 
-cb_function void r_command_draw   (R_Command_Draw *draw);
+// TODO(cmat): shouldn't be exposed in userland.
+cb_function void r_command_reset      (void);
+cb_function void r_command_push_draw  (R_Command_Draw *draw);
 
-cb_function void r_init           (Platform_Render_Context *render_context);
-cb_function void r_frame_flush    (void);
+cb_function void r_init               (Platform_Render_Context *render_context);
+cb_function void r_frame_flush        (void);
 
 // ------------------------------------------------------------
 // #-- Default Resources

@@ -81,6 +81,8 @@ cb_function Platform_Frame_State *platform_frame_state(void);
 
 force_inline cb_function Platform_Input           *platform_input           (void)  { return &platform_frame_state()->input;            }
 force_inline cb_function Platform_Display         *platform_display         (void)  { return &platform_frame_state()->display;          }
+force_inline cb_function R2I                       platform_display_region  (void)  { return r2i_v(v2i(0, 0), v2i((I32)platform_display()->resolution.x, (I32)platform_display()->resolution.y)); }
+
 
 // ------------------------------------------------------------
 // #-- Entry Point

@@ -308,7 +308,7 @@ typedef struct {
 #if COMPILER_CLANG || COMPILER_GCC
 force_inline cb_function void memory_copy    (void *dst, void *src, U64 bytes) { __builtin_memcpy(dst, src, bytes); }
 force_inline cb_function void memory_fill    (void *dst, U08 fill, U64 bytes)  { __builtin_memset(dst, fill, bytes); }
-force_inline cb_function B32  memory_compare (void *lhs, void *rhs, U64 bytes) { return __builtin_memcmp(lhs, rhs, bytes); }
+force_inline cb_function B32  memory_compare (void *lhs, void *rhs, U64 bytes) { return __builtin_memcmp(lhs, rhs, bytes) == 0; }
 
 #elif COMPILER_MSVC
 # pragma intrinsic(__movsb)
@@ -693,9 +693,13 @@ inline cb_function U64 address_align(U64 address, U64 align) {
   return address;
 }
 
-inline cb_function U08 *pointer_align(U08 *pointer, U64 align) {
+inline cb_function U08 *pointer_align(void *pointer, U64 align) {
   U64 address = (U64)pointer;
   address = address_align(address, align);
   pointer = (U08 *)address;
   return pointer;
+}
+
+inline cb_function U08 *pointer_offset_bytes(void *pointer, I64 bytes) {
+  return (((U08 *)pointer) + bytes);
 }

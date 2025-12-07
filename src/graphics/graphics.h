@@ -117,6 +117,8 @@ cb_function void g2_draw_line_ext(G2_Line *line);
       __VA_ARGS__                                           \
   });
 
+#if 0
+
 // NOTE(cmat): Text
 
 typedef struct G2_Text {
@@ -140,4 +142,4 @@ cb_function void g2_draw_text_ext(G2_Text *text);
       __VA_ARGS__                                         \
   });
 
-
+#endif

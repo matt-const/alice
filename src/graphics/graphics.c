@@ -10,7 +10,7 @@
 typedef struct G2_Buffer {
   U64               vertex_at;
   U64               vertex_capacity;
-  R_Vertex_XCU_2D  *vertex_array;
+  R_Vertex_XUC_2D  *vertex_array;
 
   U64               index_at;
   U64               index_capacity;
@@ -23,7 +23,7 @@ typedef struct G2_Buffer {
 typedef U32 G2_Draw_Mode;
 enum {
   G2_Draw_Mode_Flat,
-  G2_Draw_Mode_MTSDF,
+  //G2_Draw_Mode_MTSDF,
 
   G2_Draw_Mode_Count,
 };
@@ -34,9 +34,8 @@ cb_global struct {
   R_Buffer            vertex_buffer;
   R_Buffer            index_buffer;
   R_Buffer            constant_viewport_2D;
-  U32                 texture_count;
-  R_Texture           texture_slots         [R_Texture_Slots];
-  R_Pipeline          pipelines             [G2_Draw_Mode_Count];
+  R_Texture           texture;
+  R_Pipeline          pipelines[G2_Draw_Mode_Count];
   G2_Draw_Mode        draw_mode;
 
   R2I                 last_clip_region;
@@ -49,18 +48,16 @@ cb_function void g2_init(void) {
   G2_State.buffer.vertex_capacity = G2_Vertex_Array_Capacity;
   G2_State.buffer.index_capacity  = G2_Index_Array_Capactiy;
 
-  G2_State.buffer.vertex_array = arena_push_count(&G2_State.arena, R_Vertex_XCU_2D, G2_State.buffer.vertex_capacity );
+  G2_State.buffer.vertex_array = arena_push_count(&G2_State.arena, R_Vertex_XUC_2D, G2_State.buffer.vertex_capacity );
   G2_State.buffer.index_array  = arena_push_count(&G2_State.arena, U32,             G2_State.buffer.index_capacity  );
 
-  G2_State.vertex_buffer = r_buffer_allocate(G2_State.buffer.vertex_capacity * sizeof(R_Vertex_XCU_2D), R_Buffer_Mode_Dynamic);
+  G2_State.vertex_buffer = r_buffer_allocate(G2_State.buffer.vertex_capacity * sizeof(R_Vertex_XUC_2D), R_Buffer_Mode_Dynamic);
   G2_State.index_buffer  = r_buffer_allocate(G2_State.buffer.index_capacity  * sizeof(U32),             R_Buffer_Mode_Dynamic);
 
-  G2_State.pipelines[G2_Draw_Mode_Flat]   = r_pipeline_create(R_Shader_Flat_2D,   R_Vertex_Format_XCU_2D);
-  G2_State.pipelines[G2_Draw_Mode_MTSDF]  = r_pipeline_create(R_Shader_MTSDF_2D,  R_Vertex_Format_XCU_2D);
+  G2_State.pipelines[G2_Draw_Mode_Flat] = r_pipeline_create(R_Shader_Flat_2D, &R_Vertex_Format_XUC_2D);
+  // G2_State.pipelines[G2_Draw_Mode_MTSDF]  = r_pipeline_create(R_Shader_MTSDF_2D,  &R_Vertex_Format_XUC_2D);
 
-  G2_State.texture_count = 0;
-  sarray_fill(G2_State.texture_slots, R_Texture_White);
-
+  G2_State.texture              = R_Texture_White;
   G2_State.constant_viewport_2D = r_buffer_allocate(sizeof(R_Constant_Buffer_Viewport_2D), R_Buffer_Mode_Dynamic);
   G2_State.last_clip_region     = r2i(0, 0, i32_limit_max, i32_limit_max);
   G2_State.active_clip_region   = G2_State.last_clip_region;
@@ -71,7 +68,7 @@ cb_function void g2_submit_draw(void) {
 
     // TODO(cmat): Move out some parts.
     V2F display_size = platform_display()->resolution;
-    r_buffer_download(&G2_State.constant_viewport_2D,
+    r_buffer_download(G2_State.constant_viewport_2D,
                         0, sizeof(R_Constant_Buffer_Viewport_2D),
                         &(R_Constant_Buffer_Viewport_2D) {
                           .NDC_From_Screen = {
@@ -86,41 +83,41 @@ cb_function void g2_submit_draw(void) {
 
     V2F resolution = platform_display()->resolution;
 
+    R2I clip_region = G2_State.last_clip_region;
+
+    clip_region.x0 = i32_max(0, clip_region.x0);
+    clip_region.y0 = i32_max(0, clip_region.y0);
+    clip_region.x1 = i32_min((I32)platform_display()->resolution.x, clip_region.x1);
+    clip_region.y1 = i32_min((I32)platform_display()->resolution.y, clip_region.y1);
+
     R_Command_Draw draw = {
-        .index_count           = G2_State.buffer.draw_index_count,
-        .index_buffer_offset   = G2_State.buffer.index_at - G2_State.buffer.draw_index_count,
+        .constant_buffer       = G2_State.constant_viewport_2D,
         .vertex_buffer         = G2_State.vertex_buffer,
         .index_buffer          = G2_State.index_buffer,
         .pipeline              = G2_State.pipelines[G2_State.draw_mode],
-        .constant_buffer_count = 1,
-        .constant_buffers      = { G2_State.constant_viewport_2D },
-        .depth_testing         = 0,
+        .texture               = G2_State.texture,
         .sampler               = R_Sampler_Linear_Clamp,
-        .clip_region           = G2_State.last_clip_region,
-        .viewport_region       = r2i(0, 0, platform_display()->resolution.x, platform_display()->resolution.y),
+        
+        .draw_index_count      = G2_State.buffer.draw_index_count,
+        .draw_index_offset     = G2_State.buffer.index_at - G2_State.buffer.draw_index_count,
+
+        .depth_test            = 0,
+
+        .draw_region           = platform_display_region(),
+        .clip_region           = clip_region,
     };
 
-    For_U32(it, G2_State.texture_count) {
-      draw.texture_slots[it] = G2_State.texture_slots[it];
-    }
-
-    For_U32_Range(it, G2_State.texture_count, R_Texture_Slots) {
-      draw.texture_slots[it] = R_Texture_White;
-    }
-
-    r_command_draw(&draw);
-    G2_State.buffer.draw_index_count = 0;
-    G2_State.texture_count           = 0;
-
-    G2_State.last_clip_region = G2_State.active_clip_region;
+    r_command_push_draw(&draw);
+    G2_State.buffer.draw_index_count  = 0;
+    G2_State.last_clip_region         = G2_State.active_clip_region;
   }
 }
 
 cb_function void g2_frame_flush(void) {
   g2_submit_draw();
   if (G2_State.buffer.index_at && G2_State.buffer.vertex_at) {
-    r_buffer_download(&G2_State.vertex_buffer,  0, G2_State.buffer.vertex_at * sizeof(R_Vertex_Format_XCU_2D),  (U08 *)G2_State.buffer.vertex_array);
-    r_buffer_download(&G2_State.index_buffer,   0, G2_State.buffer.index_at *  sizeof(U32),                     (U08 *)G2_State.buffer.index_array);
+    r_buffer_download(G2_State.vertex_buffer,  0, G2_State.buffer.vertex_at * sizeof(R_Vertex_XUC_2D),  (U08 *)G2_State.buffer.vertex_array);
+    r_buffer_download(G2_State.index_buffer,   0, G2_State.buffer.index_at *  sizeof(U32),              (U08 *)G2_State.buffer.index_array);
   }
   
   G2_State.buffer.vertex_at         = 0;
@@ -134,10 +131,9 @@ cb_function void g2_frame_flush(void) {
 }
 
 typedef struct {
-  R_Vertex_XCU_2D *vertices;
+  R_Vertex_XUC_2D *vertices;
   U32             *indices;
   U32              base_index;
-  U32              texture_slot;
 } G2_Draw_Entry;
 
 cb_function G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Texture texture, G2_Draw_Mode mode) {
@@ -151,34 +147,26 @@ cb_function G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Text
     submit_draw = 1;
   }
 
-  if (memory_compare(&G2_State.last_clip_region, &G2_State.active_clip_region, sizeof(R2I))) {
+  if (G2_State.last_clip_region.x0 != G2_State.active_clip_region.x0 ||
+      G2_State.last_clip_region.y0 != G2_State.active_clip_region.y0 ||
+      G2_State.last_clip_region.x1 != G2_State.active_clip_region.x1 ||
+      G2_State.last_clip_region.y1 != G2_State.active_clip_region.y1) {
+
+    submit_draw = 1;
+  }
+
+  if (texture != G2_State.texture) {
     submit_draw = 1;
   }
 
   if (submit_draw) {
     g2_submit_draw();
   }
-
-  U32 texture_slot  = 0;
-  B32 texture_found = 0;
-
-  For_U32(it, G2_State.texture_count) {
-    if (texture.id == G2_State.texture_slots[it].id) {
-      texture_found = 1;
-      texture_slot = it;
-    }
-  }
   
-  if (!texture_found) {
-    G2_State.texture_slots[G2_State.texture_count] = texture;
-    texture_slot = G2_State.texture_count++;
-  }
-   
   G2_Draw_Entry entry = {
     .base_index   = G2_State.buffer.draw_index_base,
     .vertices     = G2_State.buffer.vertex_array + G2_State.buffer.vertex_at,
     .indices      = G2_State.buffer.index_array  + G2_State.buffer.index_at,
-    .texture_slot = texture_slot,
   };
 
   G2_State.buffer.draw_index_base   += vertex_count;
@@ -186,7 +174,8 @@ cb_function G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Text
   G2_State.buffer.vertex_at         += vertex_count;
   G2_State.buffer.index_at          += index_count;
   G2_State.draw_mode                 = mode;
-  
+  G2_State.texture                   = texture;
+
   return entry;
 }
 
@@ -197,9 +186,9 @@ cb_function void g2_draw_tri_ext(G2_Tri *tri) {
   entry.indices[2]  = entry.base_index + 2;
   
   U32 packed_color  = abgr_u32_from_rgba(tri->color);
-  entry.vertices[0] = (R_Vertex_XCU_2D) { .X = tri->x1, .C = packed_color, .U = tri->u1, .Texture_Slot = entry.texture_slot };
-  entry.vertices[1] = (R_Vertex_XCU_2D) { .X = tri->x2, .C = packed_color, .U = tri->u2, .Texture_Slot = entry.texture_slot };
-  entry.vertices[2] = (R_Vertex_XCU_2D) { .X = tri->x3, .C = packed_color, .U = tri->u3, .Texture_Slot = entry.texture_slot };
+  entry.vertices[0] = (R_Vertex_XUC_2D) { .X = tri->x1, .C = packed_color, .U = tri->u1, };
+  entry.vertices[1] = (R_Vertex_XUC_2D) { .X = tri->x2, .C = packed_color, .U = tri->u2, };
+  entry.vertices[2] = (R_Vertex_XUC_2D) { .X = tri->x3, .C = packed_color, .U = tri->u3, };
 }
 
 cb_function void g2_draw_rect_ext(G2_Rect *rect) {
@@ -224,10 +213,10 @@ cb_function void g2_draw_rect_ext(G2_Rect *rect) {
   V2F U2 = rect->uv_tr;
   V2F U3 = v2f(rect->uv_bl.x, rect->uv_tr.y);
   
-  entry.vertices[0] = (R_Vertex_XCU_2D) { .X = X0, .C = packed_color, .U = U0, .Texture_Slot = entry.texture_slot };
-  entry.vertices[1] = (R_Vertex_XCU_2D) { .X = X1, .C = packed_color, .U = U1, .Texture_Slot = entry.texture_slot };
-  entry.vertices[2] = (R_Vertex_XCU_2D) { .X = X2, .C = packed_color, .U = U2, .Texture_Slot = entry.texture_slot };
-  entry.vertices[3] = (R_Vertex_XCU_2D) { .X = X3, .C = packed_color, .U = U3, .Texture_Slot = entry.texture_slot };
+  entry.vertices[0] = (R_Vertex_XUC_2D) { .X = X0, .C = packed_color, .U = U0, };
+  entry.vertices[1] = (R_Vertex_XUC_2D) { .X = X1, .C = packed_color, .U = U1, };
+  entry.vertices[2] = (R_Vertex_XUC_2D) { .X = X2, .C = packed_color, .U = U2, };
+  entry.vertices[3] = (R_Vertex_XUC_2D) { .X = X3, .C = packed_color, .U = U3, };
 }
 
 cb_function void g2_draw_rect_rounded_ext(G2_Rect_Rounded *rect) {
@@ -245,16 +234,15 @@ cb_function void g2_draw_disk_ext(G2_Disk *disk) {
   }
 
   U32 packed_color = abgr_u32_from_rgba(disk->color);
-  entry.vertices[0] = (R_Vertex_XCU_2D) { .X = disk->pos, .C = packed_color, .U = v2f(0, 0), .Texture_Slot = entry.texture_slot };
+  entry.vertices[0] = (R_Vertex_XUC_2D) { .X = disk->pos, .C = packed_color, .U = v2f(0, 0), };
   For_U32(it, resolution) {
     F32 theta = (F32)it / (F32)resolution * f32_2pi;
 
     V2F position = v2f_add(disk->pos, v2f_mul(disk->radius, v2f(f32_cos(theta), f32_sin(theta))));
-    entry.vertices[it + 1] = (R_Vertex_XCU_2D) {
+    entry.vertices[it + 1] = (R_Vertex_XUC_2D) {
       .X            = position,
       .C            = packed_color,
       .U            = v2f(0, 0),
-      .Texture_Slot = entry.texture_slot
     };
   }
 }
@@ -275,11 +263,13 @@ cb_function void g2_draw_line_ext(G2_Line *line) {
   V2F normal_2 = v2f_mul(line->thickness / 2, v2f( delta.y, -delta.x));
 
   U32 packed_color = abgr_u32_from_rgba(line->color);
-  entry.vertices[0] = (R_Vertex_XCU_2D) { .X = v2f_add(line->start, normal_1), .C = packed_color, .U = v2f(0, 0), .Texture_Slot = entry.texture_slot };
-  entry.vertices[1] = (R_Vertex_XCU_2D) { .X = v2f_add(line->start, normal_2), .C = packed_color, .U = v2f(0, 0), .Texture_Slot = entry.texture_slot };
-  entry.vertices[2] = (R_Vertex_XCU_2D) { .X = v2f_add(line->end,   normal_2), .C = packed_color, .U = v2f(0, 0), .Texture_Slot = entry.texture_slot };
-  entry.vertices[3] = (R_Vertex_XCU_2D) { .X = v2f_add(line->end,   normal_1), .C = packed_color, .U = v2f(0, 0), .Texture_Slot = entry.texture_slot };
+  entry.vertices[0] = (R_Vertex_XUC_2D) { .X = v2f_add(line->start, normal_1), .C = packed_color, .U = v2f(0, 0), };
+  entry.vertices[1] = (R_Vertex_XUC_2D) { .X = v2f_add(line->start, normal_2), .C = packed_color, .U = v2f(0, 0), };
+  entry.vertices[2] = (R_Vertex_XUC_2D) { .X = v2f_add(line->end,   normal_2), .C = packed_color, .U = v2f(0, 0), };
+  entry.vertices[3] = (R_Vertex_XUC_2D) { .X = v2f_add(line->end,   normal_1), .C = packed_color, .U = v2f(0, 0), };
 }
+
+#if 0
 
 // TODO(cmat): This is all bad. Needs fixing.
 cb_function void g2_draw_text_ext(G2_Text *text) {
@@ -337,15 +327,18 @@ cb_function void g2_draw_text_ext(G2_Text *text) {
       V2F U2 = g->atlas_bounds.max;
       V2F U3 = v2f(g->atlas_bounds.min.x, g->atlas_bounds.max.y);
 
-      entry.vertices[vertex_at++] = (R_Vertex_XCU_2D) { .X = x_array[0], .C = packed_color, .U = U0, .Texture_Slot = entry.texture_slot };
-      entry.vertices[vertex_at++] = (R_Vertex_XCU_2D) { .X = x_array[1], .C = packed_color, .U = U1, .Texture_Slot = entry.texture_slot };
-      entry.vertices[vertex_at++] = (R_Vertex_XCU_2D) { .X = x_array[2], .C = packed_color, .U = U2, .Texture_Slot = entry.texture_slot };
-      entry.vertices[vertex_at++] = (R_Vertex_XCU_2D) { .X = x_array[3], .C = packed_color, .U = U3, .Texture_Slot = entry.texture_slot };
+      entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[0], .C = packed_color, .U = U0, };
+      entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[1], .C = packed_color, .U = U1, };
+      entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[2], .C = packed_color, .U = U2, };
+      entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[3], .C = packed_color, .U = U3, };
     }
 
     draw_at.x += text->height * g->advance;
   }
 }
+
+#endif
+
 
 cb_function void g2_clip_region(R2I region) {
   G2_State.active_clip_region = region;
