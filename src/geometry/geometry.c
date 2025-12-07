@@ -2,12 +2,18 @@
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
 // ------------------------------------------------------------
-// #-- 3D Geometry Construction
+// #-- 2D Rect Packing.
+
+// ------------------------------------------------------------
+// #-- 3D Geometry Construction.
+
+#if 0
 
 cb_function GEO3_Path geo3_build_path(Arena *arena, GEO3_Path control_nodes, U64 oversample, U64 subdiv_level) {
 
   GEO3_Path result = {};
-  Scratch_Scope(scratch, arena) {
+  Scratch scratch = { };
+  Scratch_Scope(&scratch, arena) {
 
     Array_F32 node_weights = {};
     array_reserve(scratch.arena, &node_weights, oversample + 1);
@@ -143,3 +149,4 @@ cb_function GEO3_Surface geo3_build_tube (Arena *arena, GEO3_Path path, F32 radi
   return surface;
 }
 
+#endif

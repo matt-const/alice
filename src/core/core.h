@@ -270,6 +270,8 @@ typedef struct {
 
 // ------------------------------------------------------------
 // #-- Control Flow
+#define For_I16(it_, max_)              for (I16 it_ = 0; (it_) < (max_); ++(it_))
+#define For_U16(it_, max_)              for (U16 it_ = 0; (it_) < (max_); ++(it_))
 
 #define For_I32(it_, max_)              for (I32 it_ = 0; (it_) < (max_); ++(it_))
 #define For_U32(it_, max_)              for (U32 it_ = 0; (it_) < (max_); ++(it_))
@@ -288,6 +290,8 @@ typedef struct {
 
 #define For_I64_Reverse(it_, max_)      for (I64 it_ = (max_ - 1); (it_) != 0; ++(it_))
 #define For_U64_Reverse(it_, max_)      for (U64 it_ = (max_ - 1); (it_) != 0; ++(it_))
+
+#define For_LL(it_, type_, first_)      for (type_ * it_ = (first_); it_ = it_->next; it)
 
 // NOTE(cmat): Defer_Scope. Works similar to D's scope(exit); the end statement is executed
 // at the end of the scope. Original idea from Ryan J Fleury, RADDebugger codebase.

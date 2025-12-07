@@ -236,42 +236,6 @@ typedef Array_Type(F64) Array_F64;
 
 typedef Array_Type(Str) Array_Str;
 
-
-#if 0
-Map_Type(U32) map = { };
-map_reserve(scratch.arena, &map, U32, 2048);
-
-map_add(scratch.arena, &map, hash_str_lit("hello 1"), 1);
-map_add(scratch.arena, &map, hash_str_lit("hello 2"), 2);
-map_add(scratch.arena, &map, hash_str_lit("hello 3"), 3);
-map_add(scratch.arena, &map, hash_str_lit("hello 4"), 4);
-
-U32 value_1 = map_get(&map, U32, hash_str_lit("hello 5"));
-
-// NOTE(cmat): smap_* is just convenience for string type key hashes.
-
-smap_add(scratch.arena, &map, "hello 1", 3);
-smap_add(scratch.arena, &map, "hello 2", 3);
-smap_add(scratch.arena, &map, "hello 3", 3);
-smap_add(scratch.arena, &map, "hello 4", 3);
-
-U32 value_2 = smap_get(&map, U32, "hello 5");
-#endif
-
-
-#if 0
-
-map_reserve(scratch.arena, &map, hash_str, U32);
-
-map_push(scratch.arena, &map, "Hello1", 3);
-map_push(scratch.arena, &map, "Hello2", 4);
-map_push(scratch.arena, &map, "Hello3", 5);
-map_push(scratch.arena, &map, "Hello4", 6);
-
-U32 value = map_at_key(&map, U32, "Hello1");
-
-#endif
-
 // ------------------------------------------------------------
 // #-- Logging
 
@@ -682,6 +646,10 @@ typedef Array_Type(V2U) Array_V2U;
 typedef Array_Type(V3U) Array_V3U;
 typedef Array_Type(V4U) Array_V4U;
 
+typedef Array_Type(V2_U16) Array_V2_U16;
+typedef Array_Type(V3_U16) Array_V3_U16;
+typedef Array_Type(V4_U16) Array_V4_U16;
+
 // ------------------------------------------------------------
 // #-- Vector Ops
 
@@ -724,27 +692,27 @@ inline cb_function V2I v2i_sub            (V2I lhs, V2I rhs)         { return (V
 inline cb_function V2I v2i_had            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x * rhs.x, lhs.y * rhs.y }; }
 inline cb_function V2I v2i_mul            (I32 lhs, V2I rhs)         { return (V2I) { lhs * rhs.x, lhs * rhs.y };     }
 inline cb_function V2I v2i_div            (V2I lhs, I32 rhs)         { return (V2I) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2I v2i_add_f32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2I v2i_sub_f32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2I v2i_mul_f32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x * rhs, lhs.y * rhs };     }
+inline cb_function V2I v2i_add_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x + rhs, lhs.y + rhs };     }
+inline cb_function V2I v2i_sub_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x - rhs, lhs.y - rhs };     }
+inline cb_function V2I v2i_mul_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x * rhs, lhs.y * rhs };     }
 
 inline cb_function V2U v2u_add            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x + rhs.x, lhs.y + rhs.y }; }
 inline cb_function V2U v2u_sub            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x - rhs.x, lhs.y - rhs.y }; }
 inline cb_function V2U v2u_had            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x * rhs.x, lhs.y * rhs.y }; }
 inline cb_function V2U v2u_mul            (U32 lhs, V2U rhs)         { return (V2U) { lhs * rhs.x, lhs * rhs.y };     }
 inline cb_function V2U v2u_div            (V2U lhs, U32 rhs)         { return (V2U) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2U v2u_add_f32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2U v2u_sub_f32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2U v2u_mul_f32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x * rhs, lhs.y * rhs };     }
+inline cb_function V2U v2u_add_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x + rhs, lhs.y + rhs };     }
+inline cb_function V2U v2u_sub_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x - rhs, lhs.y - rhs };     }
+inline cb_function V2U v2u_mul_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x * rhs, lhs.y * rhs };     }
 
 inline cb_function V2_U16 v2_u16_add      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x + rhs.x, lhs.y + rhs.y }; }
 inline cb_function V2_U16 v2_u16_sub      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x - rhs.x, lhs.y - rhs.y }; }
 inline cb_function V2_U16 v2_u16_had      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x * rhs.x, lhs.y * rhs.y }; }
 inline cb_function V2_U16 v2_u16_mul      (U16    lhs, V2_U16 rhs)   { return (V2_U16) { lhs * rhs.x, lhs * rhs.y };     }
 inline cb_function V2_U16 v2_u16_div      (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2_U16 v2_u16_add_f32  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2_U16 v2_u16_sub_f32  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2_U16 v2_u16_mul_f32  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x * rhs, lhs.y * rhs };     }
+inline cb_function V2_U16 v2_u16_add_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x + rhs, lhs.y + rhs };     }
+inline cb_function V2_U16 v2_u16_sub_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x - rhs, lhs.y - rhs };     }
+inline cb_function V2_U16 v2_u16_mul_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x * rhs, lhs.y * rhs };     }
 
 // NOTE(cmat): 3D
 inline cb_function V3F v3f_add         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z };  }
@@ -761,27 +729,27 @@ inline cb_function V3I v3i_sub         (V3I lhs, V3I rhs)      { return (V3I) { 
 inline cb_function V3I v3i_had         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
 inline cb_function V3I v3i_mul         (I32 lhs, V3I rhs)      { return (V3I) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
 inline cb_function V3I v3i_div         (V3I lhs, I32 rhs)      { return (V3I) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3I v3i_add_f32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3I v3i_sub_f32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3I v3i_mul_f32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline cb_function V3I v3i_add_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline cb_function V3I v3i_sub_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline cb_function V3I v3i_mul_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
 inline cb_function V3U v3u_add         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
 inline cb_function V3U v3u_sub         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
 inline cb_function V3U v3u_had         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
 inline cb_function V3U v3u_mul         (U32 lhs, V3U rhs)      { return (V3U) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
 inline cb_function V3U v3u_div         (V3U lhs, U32 rhs)      { return (V3U) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3U v3u_add_f32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3U v3u_sub_f32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3U v3u_mul_f32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline cb_function V3U v3u_add_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline cb_function V3U v3u_sub_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline cb_function V3U v3u_mul_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
 inline cb_function V3_U16 v3_u16_add         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
 inline cb_function V3_U16 v3_u16_sub         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
 inline cb_function V3_U16 v3_u16_had         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
 inline cb_function V3_U16 v3_u16_mul         (U16 lhs, V3_U16 rhs)         { return (V3_U16) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
 inline cb_function V3_U16 v3_u16_div         (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3_U16 v3_u16_add_f32     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3_U16 v3_u16_sub_f32     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3_U16 v3_u16_mul_f32     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline cb_function V3_U16 v3_u16_add_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline cb_function V3_U16 v3_u16_sub_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline cb_function V3_U16 v3_u16_mul_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
 
 // NOTE(cmat): 4D
