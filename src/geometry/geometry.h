@@ -23,6 +23,8 @@ cb_function void skyline_packer_reset(Skyline_Packer *sk) {
   array_push(&sk->nodes, v2_u16(0, 0));
 }
 
+U64 largest_erase = 0;
+
 cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border, V2_U16 *packed_position) {
   rect.x += border;
   rect.y += border;
@@ -35,6 +37,9 @@ cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border,
 
   For_U16(it, sk->nodes.len) {
     V2_U16 p = sk->nodes.dat[it];
+
+    if (p.x == 0) p.x += border;
+    if (p.y == 0) p.y += border;
 
     if (p.x + rect.x > sk->atlas_size.x) break;
     if (p.y >= best_fit_y)               continue;
@@ -87,6 +92,16 @@ cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border,
       sk->nodes.len += (insert_count - remove_count);
 
     } else if (insert_count < remove_count) {
+      U16 erase_count = remove_count - insert_count;
+      array_erase(&sk->nodes, best_fit_end_idx - erase_count, erase_count);
+
+      largest_erase = u16_max(largest_erase, erase_count);
+
+#if 0
+      // [best_fit_end_idx - COUNT, sk->nodes.len - COUNT]
+      // [best_fit_end_idx, sk->nodes.len]
+
+
       U16 idx   = best_fit_end_idx;
       U16 idx_2 = idx - (remove_count - insert_count);
 
@@ -95,6 +110,7 @@ cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border,
       }
 
       sk->nodes.len -= (remove_count - insert_count);
+#endif
     }
 
     sk->nodes.dat[best_fit_start_idx] = new_top_left;

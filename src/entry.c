@@ -22,7 +22,7 @@
 
 Random_Seed RNG = 1234;
 
-#define BIN_COUNT 800
+#define BIN_COUNT 2000
 
 Arena packer_arena = { };
 Skyline_Packer sk = { };
@@ -48,17 +48,20 @@ cb_function void next_frame(B32 first_frame, Platform_Render_Context *render_con
   }
 
   if (bin_at < BIN_COUNT) {
-    V2_U16 rect = v2_u16(10 + (U16)(random_next(&RNG) % 90), 10 + (U16)(random_next(&RNG) % 90));
+    V2_U16 rect = v2_u16(5 + (U16)(random_next(&RNG) % 50), 5 + (U16)(random_next(&RNG) % 50));
     V2_U16 pos  = { };
     skyline_packer_push(&sk, rect, 5, &pos);
     bin_positions[bin_at] = v2f(pos.x, pos.y);
     bin_sizes[bin_at]     = v2f(rect.x, rect.y);
-    bin_colors[bin_at].xyz = rgb_from_hsv(v3f(f32_random_unilateral(&RNG), .8f, .8f));
+    bin_colors[bin_at].xyz = rgb_from_hsv(v3f(f32_random_unilateral(&RNG), .5f, .8f + .2f * f32_random_unilateral(&RNG)));
     bin_colors[bin_at].a   = 1.f;
 
     bin_at++;
   }
 
+  if (bin_at == BIN_COUNT) {
+    log_info("skyline size: %llu", sk.nodes.len);
+  }
   
   For_U32(it, bin_at) {
     g2_draw_rect(bin_positions[it], bin_sizes[it], .color = bin_colors[it]);

@@ -182,17 +182,12 @@ cb_function void         scratch_init_for_thread (void);
 cb_function Arena *      scratch_get_for_thread  (Arena *conflict);
 
 typedef Arena_Temp Scratch;
-// #define scratch_start(arena_conflict)            arena_temp_start (scratch_get_for_thread(arena_conflict))
-// #define scratch_end(arena_temp)                  arena_temp_end   (arena_temp);
 
 force_inline cb_function Scratch  scratch_start (Arena *conflict)     { return arena_temp_start(scratch_get_for_thread(conflict)); }
 force_inline cb_function void     scratch_end   (Scratch *scratch)    { arena_temp_end(scratch); }
 
-#define Scratch_Scope(scratch_, conflict_) \
-  Defer_Scope(*(scratch_) = scratch_start(conflict_), scratch_end(scratch_))
-  // for (*(scratch_) = scratch_start(conflict_); (scratch_name_).arena; scratch_end(&scratch_name_))
+#define Scratch_Scope(scratch_, conflict_) Defer_Scope(*(scratch_) = scratch_start(conflict_), scratch_end(scratch_))
   
-
 // ------------------------------------------------------------
 // #-- Array
 
@@ -217,9 +212,30 @@ inline cb_function void array_reserve_ext(Arena *arena, Array_Header *header, vo
     ((array_)->dat[(array_)->len++]) = (value_);                      \
   } while(0);
 
+inline cb_function void array_erase_ext(Array_Header *header, U08 *dat, U64 type_bytes, U64 erase_index, U64 erase_count) {
+  U64 erase_from_byte = erase_index * type_bytes;
+  U64 erase_bytes     = erase_count * type_bytes;
+  U64 len_bytes       = header->len * type_bytes;
+
+  U64 copy_byte_idx = erase_from_byte + erase_bytes;
+  while (copy_byte_idx < len_bytes) {
+    dat[erase_from_byte++] = dat[copy_byte_idx++];
+  }
+
+  header->len -= erase_count;
+}
+
+#define array_erase(array_, index_, erase_count_) \
+  array_erase_ext(                                \
+      (Array_Header *)(array_),                   \
+      (U08 *)(array_)->dat,                       \
+      sizeof((array_)->dat[0]),                   \
+      index_,                                     \
+      erase_count_);
 
 #define array_clear(array_) ((array_)->len) = 0;
-#define array_from_sarray(array_type_, sarray_) (array_type_) { .len = sarray_len(sarray_), .cap = sarray_len(sarray_), .dat = sarray_ }
+#define array_from_sarray(array_type_, sarray_) \
+  (array_type_) { .len = sarray_len(sarray_), .cap = sarray_len(sarray_), .dat = sarray_ }
 
 typedef Array_Type(I08) Array_I08;
 typedef Array_Type(I16) Array_I16;
@@ -315,7 +331,6 @@ typedef struct Logger_Entry {
 // NOTE(cmat): Callback prototypes.
 typedef void Logger_Write_Entry_Hook  (Logger_Entry_Type type, Str buffer);
 typedef void Logger_Format_Entry_Hook (Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth);
-
 
 // NOTE(cmat): Each thread shares the same global logger.
 // - Every log function is thread safe (they are all wrapped in a mutex).
