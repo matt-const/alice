@@ -4,14 +4,19 @@
 // ------------------------------------------------------------
 // #-- 2D
 
+// TODO(cmat): Cleanup
+// TODO(cmat): Switch to a linked-list based implementation. We will NEVER have more than a 1k nodes,
+// Only like 100 even in the worse case scenario, so it's pointless doing allocating an array this large.
+// Array shifts seem also unnecessary.
+
 // https://jvernay.fr/en/blog/skyline-2d-packer/implementation/
 
 typedef struct Skyline_Packer {
-  V2I          atlas_size;
+  V2_U16       atlas_size;
   Array_V2_U16 nodes;
 } Skyline_Packer;
 
-cb_function void skyline_packer_init(Skyline_Packer *sk, Arena *arena, V2I atlas_size) {
+cb_function void skyline_packer_init(Skyline_Packer *sk, Arena *arena, V2_U16 atlas_size) {
   sk->atlas_size = atlas_size;
 
   array_reserve(arena, &sk->nodes, atlas_size.x);
@@ -22,8 +27,6 @@ cb_function void skyline_packer_reset(Skyline_Packer *sk) {
   array_clear(&sk->nodes);
   array_push(&sk->nodes, v2_u16(0, 0));
 }
-
-U64 largest_erase = 0;
 
 cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border, V2_U16 *packed_position) {
   rect.x += border;
@@ -59,7 +62,6 @@ cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border,
     if (p.y >= best_fit_y)                continue;
     if (p.y + rect.y > sk->atlas_size.y)  continue;
 
-
     best_fit_x = p.x;
     best_fit_y = p.y;
 
@@ -94,23 +96,6 @@ cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border,
     } else if (insert_count < remove_count) {
       U16 erase_count = remove_count - insert_count;
       array_erase(&sk->nodes, best_fit_end_idx - erase_count, erase_count);
-
-      largest_erase = u16_max(largest_erase, erase_count);
-
-#if 0
-      // [best_fit_end_idx - COUNT, sk->nodes.len - COUNT]
-      // [best_fit_end_idx, sk->nodes.len]
-
-
-      U16 idx   = best_fit_end_idx;
-      U16 idx_2 = idx - (remove_count - insert_count);
-
-      while (idx < sk->nodes.len) {
-        sk->nodes.dat[idx_2++] = sk->nodes.dat[idx++];
-      }
-
-      sk->nodes.len -= (remove_count - insert_count);
-#endif
     }
 
     sk->nodes.dat[best_fit_start_idx] = new_top_left;

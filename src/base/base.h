@@ -9,13 +9,13 @@
   do {                                              \
     (node_)->next_name_ = (first_);                 \
     (first_) = (node_);                             \
-  } while(0);
+  } while(0)
 
 #define stack_pop(first_) stack_pop_ext(first_, next)
 #define stack_pop_ext(first_, next_name_)           \
   do {                                              \
     (first_) = (first_)->next_name_;                \
-  } while(0);
+  } while(0)
 
 // ------------------------------------------------------------
 // #-- Queue
@@ -32,7 +32,7 @@
       (last_)              = (node_);                     \
       (node_)->next_name_  = 0;                           \
     }                                                     \
-  } while(0);
+  } while(0)
 
 #define queue_pop(first_, last_) queue_pop_ext(first_, last_, next)
 #define queue_pop_ext(first_, last_, next_name_)          \
@@ -43,7 +43,7 @@
     } else {                                              \
       (first_) = (first_)->next_name_;                    \
     }                                                     \
-  } while(0);
+  } while(0)
 
 // ------------------------------------------------------------
 // #-- Arena
@@ -210,9 +210,12 @@ inline cb_function void array_reserve_ext(Arena *arena, Array_Header *header, vo
   do {                                                                \
     Assert((array_)->len != (array_)->cap, "array out of capacity");  \
     ((array_)->dat[(array_)->len++]) = (value_);                      \
-  } while(0);
+  } while(0)
 
 inline cb_function void array_erase_ext(Array_Header *header, U08 *dat, U64 type_bytes, U64 erase_index, U64 erase_count) {
+  // TODO(cmat): Check why this triggers
+  Assert(erase_index + erase_count <= header->len, "erase out of bounds");
+
   U64 erase_from_byte = erase_index * type_bytes;
   U64 erase_bytes     = erase_count * type_bytes;
   U64 len_bytes       = header->len * type_bytes;

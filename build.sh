@@ -37,7 +37,6 @@ source_files+=" ${source_folder}/entry.c"
 
 # ------------------------------------------------------------
 # -- Clean build
-rm -rf   $build_folder
 mkdir -p $build_folder
 
 # ------------------------------------------------------------
@@ -72,7 +71,9 @@ compiler_flags+=" -fno-builtin-strlen"
 
 
 compiler_flags+=" --target=wasm32"
+compiler_flags+=" -ffreestanding"
 compiler_flags+=" -nostdlib"
+compiler_flags+=" -nodefaultlibs"
 compiler_flags+=" -msimd128"
 
 linker_flags+=" -flto"

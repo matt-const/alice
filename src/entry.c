@@ -17,55 +17,72 @@
 #include "graphics/graphics_build.h"
 #include "graphics/graphics_build.c"
 
+#include "font/font_build.h"
+#include "font/font_build.c"
+
 #include "geometry/geometry_build.h"
 #include "geometry/geometry_build.c"
 
-Random_Seed RNG = 1234;
+#include "ubuntu_regular.c"
+#include "font_awesome_7_solid.c"
 
-#define BIN_COUNT 2000
-
-Arena packer_arena = { };
-Skyline_Packer sk = { };
-
-U32 bin_at = 0;
-V2F bin_positions[BIN_COUNT] = { };
-V2F bin_sizes    [BIN_COUNT] = { };
-V4F bin_colors   [BIN_COUNT] = { };
+R_Texture Glyph_Texture;
+V2_U16 atlas_size = { 512, 512 };
 
 cb_function void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {
     r_init(render_context);
     g2_init();
 
-    arena_init(&packer_arena);
-    skyline_packer_init(&sk, &packer_arena, v2i(1800, 1800));
+    STBTT_backend_init();
+
+    stbtt_fontinfo font = { };
+    if (!stbtt_InitFont(&font, Ubuntu_Regular_ttf, 0)) {
+      log_fatal("failed to load font");
+    }
+
+    I32 codepoint_start = ' ';
+    I32 codepoint_end   = '~';
+
+    Scratch scratch = { };
+    Scratch_Scope(&scratch, 0) {
+      U08 *texture_data = arena_push_count(scratch.arena, U08, 4 * atlas_size.x * atlas_size.y);
+      F32 scale         = stbtt_ScaleForPixelHeight(&font, 64);
+      
+      Skyline_Packer sk = { };
+      skyline_packer_init(&sk, scratch.arena, atlas_size);
+
+      For_I64_Range(it_glyph, codepoint_start, codepoint_end) {
+        I32 glyph_width  = 0;
+        I32 glyph_height = 0;
+        I32 glyph_x_off  = 0;
+        I32 glyph_y_off  = 0;
+        U08 *bitmap      = stbtt_GetCodepointBitmap(&font, 0, scale, it_glyph, &glyph_width, &glyph_height, &glyph_x_off, &glyph_y_off);
+
+        V2_U16 packed_position = { };
+        if (skyline_packer_push(&sk, v2_u16((U16)glyph_width, (U16)glyph_height), 1, &packed_position)) {
+          For_U64(it_h, glyph_height) {
+            For_U64(it_w, glyph_width) {
+              I64 dst_it = ((packed_position.y + it_h) * atlas_size.y + (packed_position.x + it_w));
+              I64 src_it = ((glyph_height - it_h - 1) * glyph_width + it_w);
+
+              texture_data[4 * dst_it + 0] = bitmap[src_it];
+              texture_data[4 * dst_it + 1] = bitmap[src_it];
+              texture_data[4 * dst_it + 2] = bitmap[src_it];
+              texture_data[4 * dst_it + 3] = bitmap[src_it];
+            }
+          }
+        }
+      }
+
+      Glyph_Texture = r_texture_allocate(R_Texture_Format_RGBA_U08_Normalized, atlas_size.x, atlas_size.y);
+      r_texture_download(Glyph_Texture, R_Texture_Format_RGBA_U08_Normalized, r2i(0, 0, atlas_size.x, atlas_size.y), texture_data);
+    }
+
+    STBTT_backend_free();
   }
 
-  if (platform_input()->mouse.left.down_first_frame) {
-    bin_at = 0;
-    skyline_packer_reset(&sk);
-    log_info("reset");
-  }
-
-  if (bin_at < BIN_COUNT) {
-    V2_U16 rect = v2_u16(5 + (U16)(random_next(&RNG) % 50), 5 + (U16)(random_next(&RNG) % 50));
-    V2_U16 pos  = { };
-    skyline_packer_push(&sk, rect, 5, &pos);
-    bin_positions[bin_at] = v2f(pos.x, pos.y);
-    bin_sizes[bin_at]     = v2f(rect.x, rect.y);
-    bin_colors[bin_at].xyz = rgb_from_hsv(v3f(f32_random_unilateral(&RNG), .5f, .8f + .2f * f32_random_unilateral(&RNG)));
-    bin_colors[bin_at].a   = 1.f;
-
-    bin_at++;
-  }
-
-  if (bin_at == BIN_COUNT) {
-    log_info("skyline size: %llu", sk.nodes.len);
-  }
-  
-  For_U32(it, bin_at) {
-    g2_draw_rect(bin_positions[it], bin_sizes[it], .color = bin_colors[it]);
-  }
+  g2_draw_rect(v2f(0.f, 0.f), v2f(atlas_size.x, atlas_size.y), .tex = Glyph_Texture);
 
   g2_frame_flush();
   r_frame_flush();

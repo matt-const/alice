@@ -1,6 +1,13 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
+typedef struct FO_Font {
+  R_Texture atlas;
+
+} FO_Font;
+
+#if 0
+
 // TODO(cmat): Very basic, primitive, dumb font
 // implementation. Use freetype for desktop, stb for web.
 // TODO(cmat): Do NOT ship this.
@@ -78,3 +85,7 @@ inline cb_function F32 font_text_width(FO_Font *font, Str string, F32 scale) {
 
   return text_width;
 }
+
+
+
+#endif

@@ -2,7 +2,15 @@
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
 // ------------------------------------------------------------
-// #-- String Operations
+// #-- String Operations.
+cb_function U64 cstring_len(char *cstring) {
+  U64 len = 0;
+  while(*cstring++) {
+    len++;
+  }
+  
+  return len;
+}
 
 cb_function Str str_slice(Str base, U64 start, U64 len) {
   Assert(base.len >= start + len, "invalid string slice");
@@ -10,10 +18,10 @@ cb_function Str str_slice(Str base, U64 start, U64 len) {
 }
 
 cb_function Str str_from_cstr(char *cstring) {
-  Str result = { .len = 0, .txt = (I08 *)cstring };
-  while(*cstring++) {
-    result.len++;
-  }
+  Str result = {
+    .len = cstring_len(cstring),
+    .txt = (I08 *)cstring
+  };
 
   return result;
 }

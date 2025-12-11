@@ -236,6 +236,7 @@ force_inline cb_function Str str(U64 len, I08 *txt) { return (Str) { .len = len,
 
 // ------------------------------------------------------------
 // #-- Strings Base Operations
+cb_function U64 cstring_len              (char *cstring);
 
 cb_function Str str_slice                 (Str base, U64 start, U64 len);
 cb_function Str str_from_cstr             (char *cstring);
@@ -304,7 +305,7 @@ typedef struct {
 
 #define sarray_len(array_)           (sizeof(array_) / sizeof((array_)[0]))
 #define sarray_zero(array_)          memory_fill(array_, 0, sarray_len(array_))
-#define sarray_fill(array_, value)   do { For_U64(it, sarray_len(array_)) { array_[it] = value; } } while(0);
+#define sarray_fill(array_, value)   do { For_U64(it, sarray_len(array_)) { array_[it] = value; } } while(0)
 
 // ------------------------------------------------------------
 // #-- Memory Operations
@@ -520,58 +521,51 @@ inline cb_function I08 char_to_lower      (I08 c) { return !char_is_alpha(c) ? c
 // ------------------------------------------------------------
 // #-- F32 Core Math
 
-#if ARCH_ARM
-# if COMPILER_CLANG || COMPILER_GCC
+#if COMPILER_CLANG || COMPILER_GCC
 
-force_inline cb_function F32 f32_floor(F32 x) {
-  F32 result = 0;
-  __asm__ volatile ("fcvtms %w0, %s1\n" "scvtf  %s0, %w0\n" : "=&w"(result) : "w"(x));
-  return result;
-}
+force_inline cb_function F32 f32_floor  (F32 x) { return __builtin_floorf(x); }
+force_inline cb_function F32 f32_ceil   (F32 x) { return __builtin_ceilf(x);  }
+force_inline cb_function F32 f32_sqrt   (F32 x) { return __builtin_sqrtf(x);  }
+force_inline cb_function F32 f32_fabs   (F32 x) { return __builtin_fabsf(x);  }
+force_inline cb_function F32 f32_acos   (F32 x) { return __builtin_acosf(x);  }
+force_inline cb_function F32 f32_asin   (F32 x) { return __builtin_asinf(x);  }
+force_inline cb_function F32 f32_ln     (F32 x) { return __builtin_logf(x);   }
+force_inline cb_function F32 f32_exp    (F32 x) { return __builtin_expf(x);   }
+force_inline cb_function F32 f32_trunc  (F32 x) { return __builtin_truncf(x); }
 
-force_inline cb_function F32 f32_ceil(F32 x) {
-  F32 result = 0;
-  __asm__ volatile ("fcvtps %w0, %s1\n" "scvtf  %s0, %w0\n" : "=&w"(result) : "w"(x));
-  return result;
-}
-
-force_inline cb_function F32 f32_sqrt(F32 x) {
-  F32 result = 0;
-  __asm__ volatile ("fsqrt %s0, %s1" : "=w"(result) : "w"(x));
-  return result;
-}
-# endif
-
-#elif ARCH_X86
-# include <immintrin.h>
-
-force_inline cb_function F32 f32_floor(F32 x) {
-  return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_set_ss(x)));
-}
-
-force_inline cb_function F32 f32_ceil(F32 x) {
-  return _mm_cvtss_f32(_mm_ceil_ss(_mm_setzero_ps(), _mm_set_ss(x)));
-}
-
-force_inline cb_function F32 f32_sqrt(F32 x) {
-  return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(x)));
-}
-
-#elif ARCH_WASM
-
-force_inline cb_function F32 f32_floor(F32 x) {
-  return __builtin_floorf(x);
-}
-
-force_inline cb_function F32 f32_ceil(F32 x) {
-  return __builtin_ceilf(x);
-}
-
-force_inline cb_function F32 f32_sqrt(F32 x) {
-  return __builtin_sqrtf(x);
-}
+#else
+#error "F32 core math ops not implemented for this target"
 
 #endif
+
+force_inline cb_function F32 f32_pow(F32 x, F32 y) {
+  F32 result = 0;
+
+  if (x >= 0) {
+    result  = f32_exp(y * f32_ln(x));
+  } else {
+
+    F32 y_floor  = f32_floor(y);
+    if (y == y_floor) {
+      result = f32_exp(y * f32_ln(-x));
+
+      if ((I32)y_floor % 2 != 0) {
+        result = -result;
+      }
+    } else {
+      // NOTE(cmat): Invalid. Can be complex, (-1)^0.5 = i
+    }
+  }
+ 
+  return result;
+}
+
+force_inline cb_function F32 f32_fmod(F32 x, F32 y) {
+  F32 q  = x / y;
+  F32 iq = f32_trunc(q);
+  return x - iq * y;
+}
+
 
 force_inline cb_function F32 f32_pow2                 (F32 x) { return x * x;                 }
 force_inline cb_function F32 f32_fract                (F32 x) { return x - f32_floor(x);      }
@@ -579,7 +573,6 @@ force_inline cb_function F32 f32_degrees_from_radians (F32 x) { return (x * 180.
 force_inline cb_function F32 f32_radians_from_degrees (F32 x) { return (x * f32_pi) / 180.0f; }
 
 cb_function F32 f32_sin (F32 x);
-
 force_inline cb_function F32 f32_cos  (F32 x) { return f32_sin(f32_hpi + x);   }
 force_inline cb_function F32 f32_tan  (F32 x) { return f32_sin(x) / f32_cos(x); }
 
@@ -672,12 +665,12 @@ cb_function Core_File_Async_State     core_file_write_async     (Core_File *file
 # define Assert_Preamble "ASSERT (" __FILE__ ":" Macro_Stringize(__LINE__) "): "
 
 # if COMPILER_GCC || COMPILER_CLANG
-#   define Assert(condition, message) do { If_Unlikely (!(condition)) { core_panic(str_lit(Assert_Preamble " " message)); __builtin_debugtrap(); } } while(0);
+#   define Assert(condition, message) do { If_Unlikely (!(condition)) { core_panic(str_lit(Assert_Preamble " " message)); __builtin_debugtrap(); } } while(0)
 # elif COMPILER_MSVC
-#   define Assert(condition, message) do { If_Unlikely (!(condition)) { core_panic(str_lit(Assert_Preamble " " message)); __debugbreak(); } } while(0);
+#   define Assert(condition, message) do { If_Unlikely (!(condition)) { core_panic(str_lit(Assert_Preamble " " message)); __debugbreak(); } } while(0)
 # endif
 #else
-# define Assert(condition, message) do { } while(0);
+# define Assert(condition, message) do { } while(0)
 #endif
 
 #define Invalid_Default default: { Assert(0, "invalid default in switch"); } break;
