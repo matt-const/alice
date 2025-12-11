@@ -1,4 +1,7 @@
 # ALICE Engine
+
+![Build](https://github.com/matt-const/alice/actions/workflows/ci.yml/badge.svg)
+
 Aims to be a simple, minimal engine for building terminal / graphical applications in C.
 Works out of the box, with minimal setup.
 
