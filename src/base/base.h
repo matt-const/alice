@@ -79,7 +79,7 @@ enum {
   Arena_Default_Flags = Arena_Push_Flag_Zero_Init,
 };
 
-cb_global U64 arena_chunk_magic = u64_pack('A','R','E','N','A','C','H','K');
+var_global U64 arena_chunk_magic = u64_pack('A','R','E','N','A','C','H','K');
 
 #if BUILD_DEBUG
 typedef struct Arena_Chunk_Header { U64 magic; } Arena_Chunk_Header;
@@ -142,10 +142,10 @@ typedef struct Arena {
   Arena_Chunk    *last_chunk;
 } Arena;
 
-cb_function void arena_init_ext (Arena *arena, Arena_Init *init);
-cb_function void arena_destroy  (Arena *arena);
-cb_function U08 *arena_push_ext (Arena *arena, U64 bytes, Arena_Push *push);
-cb_function void arena_clear    (Arena *arena);
+fn_internal void arena_init_ext (Arena *arena, Arena_Init *init);
+fn_internal void arena_destroy  (Arena *arena);
+fn_internal U08 *arena_push_ext (Arena *arena, U64 bytes, Arena_Push *push);
+fn_internal void arena_clear    (Arena *arena);
 
 #define arena_init(arena, ...)                      arena_init_ext((arena), &(Arena_Init) { .flags = Arena_Flag_Defaults, .reserve_initial = 0, __VA_ARGS__ })
 #define arena_push_size(arena, bytes, ...)          arena_push_ext((arena), (bytes), &(Arena_Push) { .align = Arena_Default_Align, .flags = Arena_Default_Flags, __VA_ARGS__ })
@@ -159,8 +159,8 @@ typedef struct Arena_Temp {
   U08         *rollback_page;
 } Arena_Temp;
 
-cb_function Arena_Temp arena_temp_start (Arena *arena);
-cb_function void       arena_temp_end   (Arena_Temp *temp);
+fn_internal Arena_Temp arena_temp_start (Arena *arena);
+fn_internal void       arena_temp_end   (Arena_Temp *temp);
 
 #define Arena_Temp_Scope(arena_, temp_name_) \
   for (Arena_Temp temp_name_ = arena_temp_start(arena_); temp_name_.arena; arena_temp_end(&temp_name_))
@@ -178,13 +178,13 @@ cb_function void       arena_temp_end   (Arena_Temp *temp);
 // - passed to the function.
 
 // TODO(cmat): struct Thread_Context
-cb_function void         scratch_init_for_thread (void);
-cb_function Arena *      scratch_get_for_thread  (Arena *conflict);
+fn_internal void         scratch_init_for_thread (void);
+fn_internal Arena *      scratch_get_for_thread  (Arena *conflict);
 
 typedef Arena_Temp Scratch;
 
-force_inline cb_function Scratch  scratch_start (Arena *conflict)     { return arena_temp_start(scratch_get_for_thread(conflict)); }
-force_inline cb_function void     scratch_end   (Scratch *scratch)    { arena_temp_end(scratch); }
+force_inline fn_internal Scratch  scratch_start (Arena *conflict)     { return arena_temp_start(scratch_get_for_thread(conflict)); }
+force_inline fn_internal void     scratch_end   (Scratch *scratch)    { arena_temp_end(scratch); }
 
 #define Scratch_Scope(scratch_, conflict_) Defer_Scope(*(scratch_) = scratch_start(conflict_), scratch_end(scratch_))
   
@@ -197,7 +197,7 @@ typedef struct Array_Header {
   U64 cap;
 } Array_Header;
 
-inline cb_function void array_reserve_ext(Arena *arena, Array_Header *header, void **dat, U64 type_size, U64 reserve_count) {
+inline fn_internal void array_reserve_ext(Arena *arena, Array_Header *header, void **dat, U64 type_size, U64 reserve_count) {
   Assert(!header->len && !header->cap, "reserving an array that's already in use");
   header->cap = reserve_count;
   *dat        = arena_push_size(arena, type_size * reserve_count);
@@ -212,7 +212,7 @@ inline cb_function void array_reserve_ext(Arena *arena, Array_Header *header, vo
     ((array_)->dat[(array_)->len++]) = (value_);                      \
   } while(0)
 
-inline cb_function void array_erase_ext(Array_Header *header, U08 *dat, U64 type_bytes, U64 erase_index, U64 erase_count) {
+inline fn_internal void array_erase_ext(Array_Header *header, U08 *dat, U64 type_bytes, U64 erase_index, U64 erase_count) {
   // TODO(cmat): Check why this triggers
   Assert(erase_index + erase_count <= header->len, "erase out of bounds");
 
@@ -308,7 +308,7 @@ enum {
 #endif
 };
 
-force_inline cb_function U32 logger_filter_flag_from_entry_type(U32 entry) {
+force_inline fn_internal U32 logger_filter_flag_from_entry_type(U32 entry) {
   U32 result = 0;
   switch (entry) {
     case Logger_Entry_Info:       { result = Logger_Filter_Info; }    break;
@@ -346,16 +346,16 @@ typedef struct Logger_State {
   Mutex                       mutex;
 } Logger_State;
 
-cb_function void  logger_set_filter            (Logger_Filter_Flag filter);
-cb_function B32   logger_filter_type           (Logger_Entry_Type type);
-cb_function void  logger_entry                 (Logger_Entry *entry);
-cb_function void  logger_push_hook             (Logger_Write_Entry_Hook *write, Logger_Format_Entry_Hook *format);
+fn_internal void  logger_set_filter            (Logger_Filter_Flag filter);
+fn_internal B32   logger_filter_type           (Logger_Entry_Type type);
+fn_internal void  logger_entry                 (Logger_Entry *entry);
+fn_internal void  logger_push_hook             (Logger_Write_Entry_Hook *write, Logger_Format_Entry_Hook *format);
 
-cb_function void  logger_write_entry_standard_stream  (Logger_Entry_Type type, Str buffer);
-cb_function void  logger_format_entry_minimal         (Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth);
-cb_function void  logger_format_entry_detailed        (Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth);
+fn_internal void  logger_write_entry_standard_stream  (Logger_Entry_Type type, Str buffer);
+fn_internal void  logger_format_entry_minimal         (Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth);
+fn_internal void  logger_format_entry_detailed        (Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth);
 
-cb_function void  log_message_ext(Logger_Entry_Type type, Function_Metadata func_meta, char *format, ...);
+fn_internal void  log_message_ext(Logger_Entry_Type type, Function_Metadata func_meta, char *format, ...);
 
 #define log_message(type_, format_, ...) log_message_ext(type_, Function_Metadata_Current, format_,##__VA_ARGS__);
 #define log_info(format_, ...)           log_message(Logger_Entry_Info,       format_,##__VA_ARGS__);
@@ -671,200 +671,200 @@ typedef Array_Type(V4_U16) Array_V4_U16;
 // ------------------------------------------------------------
 // #-- Vector Ops
 
-force_inline cb_function V2F v2f       (F32 x, F32 y)                  { return (V2F) { x, y };       }
-force_inline cb_function V3F v3f       (F32 x, F32 y, F32 z)           { return (V3F) { x, y, z };    }
-force_inline cb_function V4F v4f       (F32 x, F32 y, F32 z, F32 w)    { return (V4F) { x, y, z, w }; }
+force_inline fn_internal V2F v2f       (F32 x, F32 y)                  { return (V2F) { x, y };       }
+force_inline fn_internal V3F v3f       (F32 x, F32 y, F32 z)           { return (V3F) { x, y, z };    }
+force_inline fn_internal V4F v4f       (F32 x, F32 y, F32 z, F32 w)    { return (V4F) { x, y, z, w }; }
 
-force_inline cb_function V2I v2i       (I32 x, I32 y)                  { return (V2I) { x, y };       }
-force_inline cb_function V3I v3i       (I32 x, I32 y, I32 z)           { return (V3I) { x, y, z };    }
-force_inline cb_function V4I v4i       (I32 x, I32 y, I32 z, I32 w)    { return (V4I) { x, y, z, w }; }
+force_inline fn_internal V2I v2i       (I32 x, I32 y)                  { return (V2I) { x, y };       }
+force_inline fn_internal V3I v3i       (I32 x, I32 y, I32 z)           { return (V3I) { x, y, z };    }
+force_inline fn_internal V4I v4i       (I32 x, I32 y, I32 z, I32 w)    { return (V4I) { x, y, z, w }; }
 
-force_inline cb_function V2U v2u       (U32 x, U32 y)                  { return (V2U) { x, y };       }
-force_inline cb_function V3U v3u       (U32 x, U32 y, U32 z)           { return (V3U) { x, y, z };    }
-force_inline cb_function V4U v4u       (U32 x, U32 y, U32 z, U32 w)    { return (V4U) { x, y, z, w }; }
+force_inline fn_internal V2U v2u       (U32 x, U32 y)                  { return (V2U) { x, y };       }
+force_inline fn_internal V3U v3u       (U32 x, U32 y, U32 z)           { return (V3U) { x, y, z };    }
+force_inline fn_internal V4U v4u       (U32 x, U32 y, U32 z, U32 w)    { return (V4U) { x, y, z, w }; }
 
-force_inline cb_function V2_U16 v2_u16 (U16 x, U16 y)                  { return (V2_U16) { x, y };       }
-force_inline cb_function V3_U16 v3_u16 (U16 x, U16 y, U16 z)           { return (V3_U16) { x, y, z };    }
-force_inline cb_function V4_U16 v4_u16 (U16 x, U16 y, U16 z, U16 w)    { return (V4_U16) { x, y, z, w }; }
+force_inline fn_internal V2_U16 v2_u16 (U16 x, U16 y)                  { return (V2_U16) { x, y };       }
+force_inline fn_internal V3_U16 v3_u16 (U16 x, U16 y, U16 z)           { return (V3_U16) { x, y, z };    }
+force_inline fn_internal V4_U16 v4_u16 (U16 x, U16 y, U16 z, U16 w)    { return (V4_U16) { x, y, z, w }; }
 
-force_inline cb_function V2F v2f_f32   (F32 x) { return (V2F) { x, x };       }
-force_inline cb_function V3F v3f_f32   (F32 x) { return (V3F) { x, x, x };    }
-force_inline cb_function V4F v4f_f32   (F32 x) { return (V4F) { x, x, x, x }; }
+force_inline fn_internal V2F v2f_f32   (F32 x) { return (V2F) { x, x };       }
+force_inline fn_internal V3F v3f_f32   (F32 x) { return (V3F) { x, x, x };    }
+force_inline fn_internal V4F v4f_f32   (F32 x) { return (V4F) { x, x, x, x }; }
 
-force_inline cb_function V2I v2i_s     (I32 x) { return (V2I) { x, x };       }
-force_inline cb_function V3I v3i_s     (I32 x) { return (V3I) { x, x, x };    }
-force_inline cb_function V4I v4i_s     (I32 x) { return (V4I) { x, x, x, x }; }
+force_inline fn_internal V2I v2i_s     (I32 x) { return (V2I) { x, x };       }
+force_inline fn_internal V3I v3i_s     (I32 x) { return (V3I) { x, x, x };    }
+force_inline fn_internal V4I v4i_s     (I32 x) { return (V4I) { x, x, x, x }; }
 
 // NOTE(cmat): 2D
-inline cb_function V2F v2f_add           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x + rhs.x, lhs.y + rhs.y }; }
-inline cb_function V2F v2f_sub           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x - rhs.x, lhs.y - rhs.y }; }
-inline cb_function V2F v2f_had           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x * rhs.x, lhs.y * rhs.y }; }
-inline cb_function V2F v2f_mul           (F32 lhs, V2F rhs)         { return (V2F) { lhs * rhs.x, lhs * rhs.y };     }
-inline cb_function V2F v2f_div           (V2F lhs, F32 rhs)         { return (V2F) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2F v2f_add_f32       (V2F lhs, F32 rhs)         { return (V2F) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2F v2f_sub_f32       (V2F lhs, F32 rhs)         { return (V2F) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2F v2f_mul_f32       (V2F lhs, F32 rhs)         { return (V2F) { lhs.x * rhs, lhs.y * rhs };     }
+inline fn_internal V2F v2f_add           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x + rhs.x, lhs.y + rhs.y }; }
+inline fn_internal V2F v2f_sub           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x - rhs.x, lhs.y - rhs.y }; }
+inline fn_internal V2F v2f_had           (V2F lhs, V2F rhs)         { return (V2F) { lhs.x * rhs.x, lhs.y * rhs.y }; }
+inline fn_internal V2F v2f_mul           (F32 lhs, V2F rhs)         { return (V2F) { lhs * rhs.x, lhs * rhs.y };     }
+inline fn_internal V2F v2f_div           (V2F lhs, F32 rhs)         { return (V2F) { lhs.x / rhs, lhs.y / rhs };     }
+inline fn_internal V2F v2f_add_f32       (V2F lhs, F32 rhs)         { return (V2F) { lhs.x + rhs, lhs.y + rhs };     }
+inline fn_internal V2F v2f_sub_f32       (V2F lhs, F32 rhs)         { return (V2F) { lhs.x - rhs, lhs.y - rhs };     }
+inline fn_internal V2F v2f_mul_f32       (V2F lhs, F32 rhs)         { return (V2F) { lhs.x * rhs, lhs.y * rhs };     }
 
-inline cb_function V2I v2i_add            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x + rhs.x, lhs.y + rhs.y }; }
-inline cb_function V2I v2i_sub            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x - rhs.x, lhs.y - rhs.y }; }
-inline cb_function V2I v2i_had            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x * rhs.x, lhs.y * rhs.y }; }
-inline cb_function V2I v2i_mul            (I32 lhs, V2I rhs)         { return (V2I) { lhs * rhs.x, lhs * rhs.y };     }
-inline cb_function V2I v2i_div            (V2I lhs, I32 rhs)         { return (V2I) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2I v2i_add_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2I v2i_sub_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2I v2i_mul_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x * rhs, lhs.y * rhs };     }
+inline fn_internal V2I v2i_add            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x + rhs.x, lhs.y + rhs.y }; }
+inline fn_internal V2I v2i_sub            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x - rhs.x, lhs.y - rhs.y }; }
+inline fn_internal V2I v2i_had            (V2I lhs, V2I rhs)         { return (V2I) { lhs.x * rhs.x, lhs.y * rhs.y }; }
+inline fn_internal V2I v2i_mul            (I32 lhs, V2I rhs)         { return (V2I) { lhs * rhs.x, lhs * rhs.y };     }
+inline fn_internal V2I v2i_div            (V2I lhs, I32 rhs)         { return (V2I) { lhs.x / rhs, lhs.y / rhs };     }
+inline fn_internal V2I v2i_add_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x + rhs, lhs.y + rhs };     }
+inline fn_internal V2I v2i_sub_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x - rhs, lhs.y - rhs };     }
+inline fn_internal V2I v2i_mul_i32        (V2I lhs, I32 rhs)         { return (V2I) { lhs.x * rhs, lhs.y * rhs };     }
 
-inline cb_function V2U v2u_add            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x + rhs.x, lhs.y + rhs.y }; }
-inline cb_function V2U v2u_sub            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x - rhs.x, lhs.y - rhs.y }; }
-inline cb_function V2U v2u_had            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x * rhs.x, lhs.y * rhs.y }; }
-inline cb_function V2U v2u_mul            (U32 lhs, V2U rhs)         { return (V2U) { lhs * rhs.x, lhs * rhs.y };     }
-inline cb_function V2U v2u_div            (V2U lhs, U32 rhs)         { return (V2U) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2U v2u_add_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2U v2u_sub_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2U v2u_mul_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x * rhs, lhs.y * rhs };     }
+inline fn_internal V2U v2u_add            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x + rhs.x, lhs.y + rhs.y }; }
+inline fn_internal V2U v2u_sub            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x - rhs.x, lhs.y - rhs.y }; }
+inline fn_internal V2U v2u_had            (V2U lhs, V2U rhs)         { return (V2U) { lhs.x * rhs.x, lhs.y * rhs.y }; }
+inline fn_internal V2U v2u_mul            (U32 lhs, V2U rhs)         { return (V2U) { lhs * rhs.x, lhs * rhs.y };     }
+inline fn_internal V2U v2u_div            (V2U lhs, U32 rhs)         { return (V2U) { lhs.x / rhs, lhs.y / rhs };     }
+inline fn_internal V2U v2u_add_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x + rhs, lhs.y + rhs };     }
+inline fn_internal V2U v2u_sub_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x - rhs, lhs.y - rhs };     }
+inline fn_internal V2U v2u_mul_u32        (V2U lhs, U32 rhs)         { return (V2U) { lhs.x * rhs, lhs.y * rhs };     }
 
-inline cb_function V2_U16 v2_u16_add      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x + rhs.x, lhs.y + rhs.y }; }
-inline cb_function V2_U16 v2_u16_sub      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x - rhs.x, lhs.y - rhs.y }; }
-inline cb_function V2_U16 v2_u16_had      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x * rhs.x, lhs.y * rhs.y }; }
-inline cb_function V2_U16 v2_u16_mul      (U16    lhs, V2_U16 rhs)   { return (V2_U16) { lhs * rhs.x, lhs * rhs.y };     }
-inline cb_function V2_U16 v2_u16_div      (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x / rhs, lhs.y / rhs };     }
-inline cb_function V2_U16 v2_u16_add_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x + rhs, lhs.y + rhs };     }
-inline cb_function V2_U16 v2_u16_sub_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x - rhs, lhs.y - rhs };     }
-inline cb_function V2_U16 v2_u16_mul_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x * rhs, lhs.y * rhs };     }
+inline fn_internal V2_U16 v2_u16_add      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x + rhs.x, lhs.y + rhs.y }; }
+inline fn_internal V2_U16 v2_u16_sub      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x - rhs.x, lhs.y - rhs.y }; }
+inline fn_internal V2_U16 v2_u16_had      (V2_U16 lhs, V2_U16 rhs)   { return (V2_U16) { lhs.x * rhs.x, lhs.y * rhs.y }; }
+inline fn_internal V2_U16 v2_u16_mul      (U16    lhs, V2_U16 rhs)   { return (V2_U16) { lhs * rhs.x, lhs * rhs.y };     }
+inline fn_internal V2_U16 v2_u16_div      (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x / rhs, lhs.y / rhs };     }
+inline fn_internal V2_U16 v2_u16_add_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x + rhs, lhs.y + rhs };     }
+inline fn_internal V2_U16 v2_u16_sub_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x - rhs, lhs.y - rhs };     }
+inline fn_internal V2_U16 v2_u16_mul_u16  (V2_U16 lhs, U16    rhs)   { return (V2_U16) { lhs.x * rhs, lhs.y * rhs };     }
 
 // NOTE(cmat): 3D
-inline cb_function V3F v3f_add         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z };  }
-inline cb_function V3F v3f_sub         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z };  }
-inline cb_function V3F v3f_mul         (F32 lhs, V3F rhs)      { return (V3F) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
-inline cb_function V3F v3f_had         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
-inline cb_function V3F v3f_div         (V3F lhs, F32 rhs)      { return (V3F) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3F v3f_add_f32     (V3F lhs, F32 rhs)      { return (V3F) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3F v3f_sub_f32     (V3F lhs, F32 rhs)      { return (V3F) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3F v3f_mul_f32     (V3F lhs, F32 rhs)      { return (V3F) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline fn_internal V3F v3f_add         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z };  }
+inline fn_internal V3F v3f_sub         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z };  }
+inline fn_internal V3F v3f_mul         (F32 lhs, V3F rhs)      { return (V3F) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
+inline fn_internal V3F v3f_had         (V3F lhs, V3F rhs)      { return (V3F) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
+inline fn_internal V3F v3f_div         (V3F lhs, F32 rhs)      { return (V3F) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
+inline fn_internal V3F v3f_add_f32     (V3F lhs, F32 rhs)      { return (V3F) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline fn_internal V3F v3f_sub_f32     (V3F lhs, F32 rhs)      { return (V3F) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline fn_internal V3F v3f_mul_f32     (V3F lhs, F32 rhs)      { return (V3F) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
-inline cb_function V3I v3i_add         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
-inline cb_function V3I v3i_sub         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
-inline cb_function V3I v3i_had         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
-inline cb_function V3I v3i_mul         (I32 lhs, V3I rhs)      { return (V3I) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
-inline cb_function V3I v3i_div         (V3I lhs, I32 rhs)      { return (V3I) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3I v3i_add_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3I v3i_sub_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3I v3i_mul_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline fn_internal V3I v3i_add         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
+inline fn_internal V3I v3i_sub         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
+inline fn_internal V3I v3i_had         (V3I lhs, V3I rhs)      { return (V3I) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
+inline fn_internal V3I v3i_mul         (I32 lhs, V3I rhs)      { return (V3I) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
+inline fn_internal V3I v3i_div         (V3I lhs, I32 rhs)      { return (V3I) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
+inline fn_internal V3I v3i_add_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline fn_internal V3I v3i_sub_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline fn_internal V3I v3i_mul_i32     (V3I lhs, I32 rhs)      { return (V3I) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
-inline cb_function V3U v3u_add         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
-inline cb_function V3U v3u_sub         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
-inline cb_function V3U v3u_had         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
-inline cb_function V3U v3u_mul         (U32 lhs, V3U rhs)      { return (V3U) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
-inline cb_function V3U v3u_div         (V3U lhs, U32 rhs)      { return (V3U) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3U v3u_add_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3U v3u_sub_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3U v3u_mul_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline fn_internal V3U v3u_add         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
+inline fn_internal V3U v3u_sub         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
+inline fn_internal V3U v3u_had         (V3U lhs, V3U rhs)      { return (V3U) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
+inline fn_internal V3U v3u_mul         (U32 lhs, V3U rhs)      { return (V3U) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
+inline fn_internal V3U v3u_div         (V3U lhs, U32 rhs)      { return (V3U) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
+inline fn_internal V3U v3u_add_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline fn_internal V3U v3u_sub_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline fn_internal V3U v3u_mul_u32     (V3U lhs, U32 rhs)      { return (V3U) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
-inline cb_function V3_U16 v3_u16_add         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
-inline cb_function V3_U16 v3_u16_sub         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
-inline cb_function V3_U16 v3_u16_had         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
-inline cb_function V3_U16 v3_u16_mul         (U16 lhs, V3_U16 rhs)         { return (V3_U16) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
-inline cb_function V3_U16 v3_u16_div         (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
-inline cb_function V3_U16 v3_u16_add_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
-inline cb_function V3_U16 v3_u16_sub_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
-inline cb_function V3_U16 v3_u16_mul_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
+inline fn_internal V3_U16 v3_u16_add         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};   }
+inline fn_internal V3_U16 v3_u16_sub         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};   }
+inline fn_internal V3_U16 v3_u16_had         (V3_U16 lhs, V3_U16 rhs)      { return (V3_U16) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z };  }
+inline fn_internal V3_U16 v3_u16_mul         (U16 lhs, V3_U16 rhs)         { return (V3_U16) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };        }
+inline fn_internal V3_U16 v3_u16_div         (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs };        }
+inline fn_internal V3_U16 v3_u16_add_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs };        }
+inline fn_internal V3_U16 v3_u16_sub_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs };        }
+inline fn_internal V3_U16 v3_u16_mul_u16     (V3_U16 lhs, U16 rhs)         { return (V3_U16) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs };        }
 
 
 // NOTE(cmat): 4D
-inline cb_function V4F v4f_add         (V4F lhs, V4F rhs)      { return (V4F) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
-inline cb_function V4F v4f_sub         (V4F lhs, V4F rhs)      { return (V4F) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
-inline cb_function V4F v4f_had         (V4F lhs, V4F rhs)      { return (V4F) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
-inline cb_function V4F v4f_mul         (F32 lhs, V4F rhs)      { return (V4F) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
-inline cb_function V4F v4f_div         (V4F lhs, F32 rhs)      { return (V4F) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
-inline cb_function V4F v4f_add_f32     (V4F lhs, F32 rhs)      { return (V4F) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
-inline cb_function V4F v4f_sub_f32     (V4F lhs, F32 rhs)      { return (V4F) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
-inline cb_function V4F v4f_mul_f32     (V4F lhs, F32 rhs)      { return (V4F) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
+inline fn_internal V4F v4f_add         (V4F lhs, V4F rhs)      { return (V4F) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
+inline fn_internal V4F v4f_sub         (V4F lhs, V4F rhs)      { return (V4F) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
+inline fn_internal V4F v4f_had         (V4F lhs, V4F rhs)      { return (V4F) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
+inline fn_internal V4F v4f_mul         (F32 lhs, V4F rhs)      { return (V4F) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
+inline fn_internal V4F v4f_div         (V4F lhs, F32 rhs)      { return (V4F) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
+inline fn_internal V4F v4f_add_f32     (V4F lhs, F32 rhs)      { return (V4F) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
+inline fn_internal V4F v4f_sub_f32     (V4F lhs, F32 rhs)      { return (V4F) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
+inline fn_internal V4F v4f_mul_f32     (V4F lhs, F32 rhs)      { return (V4F) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
 
-inline cb_function V4I v4i_add         (V4I lhs, V4I rhs)      { return (V4I) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
-inline cb_function V4I v4i_sub         (V4I lhs, V4I rhs)      { return (V4I) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
-inline cb_function V4I v4i_had         (V4I lhs, V4I rhs)      { return (V4I) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
-inline cb_function V4I v4i_mul         (I32 lhs, V4I rhs)      { return (V4I) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
-inline cb_function V4I v4i_div         (V4I lhs, I32 rhs)      { return (V4I) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
-inline cb_function V4I v4i_add_i32     (V4I lhs, I32 rhs)      { return (V4I) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
-inline cb_function V4I v4i_sub_i32     (V4I lhs, I32 rhs)      { return (V4I) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
-inline cb_function V4I v4i_mul_i32     (V4I lhs, I32 rhs)      { return (V4I) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
+inline fn_internal V4I v4i_add         (V4I lhs, V4I rhs)      { return (V4I) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
+inline fn_internal V4I v4i_sub         (V4I lhs, V4I rhs)      { return (V4I) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
+inline fn_internal V4I v4i_had         (V4I lhs, V4I rhs)      { return (V4I) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
+inline fn_internal V4I v4i_mul         (I32 lhs, V4I rhs)      { return (V4I) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
+inline fn_internal V4I v4i_div         (V4I lhs, I32 rhs)      { return (V4I) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
+inline fn_internal V4I v4i_add_i32     (V4I lhs, I32 rhs)      { return (V4I) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
+inline fn_internal V4I v4i_sub_i32     (V4I lhs, I32 rhs)      { return (V4I) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
+inline fn_internal V4I v4i_mul_i32     (V4I lhs, I32 rhs)      { return (V4I) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
 
-inline cb_function V4U v4u_add         (V4U lhs, V4U rhs)      { return (V4U) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
-inline cb_function V4U v4u_sub         (V4U lhs, V4U rhs)      { return (V4U) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
-inline cb_function V4U v4u_had         (V4U lhs, V4U rhs)      { return (V4U) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
-inline cb_function V4U v4u_mul         (U32 lhs, V4U rhs)      { return (V4U) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
-inline cb_function V4U v4u_div         (V4U lhs, U32 rhs)      { return (V4U) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
-inline cb_function V4U v4u_add_u32     (V4U lhs, U32 rhs)      { return (V4U) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
-inline cb_function V4U v4u_sub_u32     (V4U lhs, U32 rhs)      { return (V4U) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
-inline cb_function V4U v4u_mul_u32     (V4U lhs, U32 rhs)      { return (V4U) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
+inline fn_internal V4U v4u_add         (V4U lhs, V4U rhs)      { return (V4U) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
+inline fn_internal V4U v4u_sub         (V4U lhs, V4U rhs)      { return (V4U) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
+inline fn_internal V4U v4u_had         (V4U lhs, V4U rhs)      { return (V4U) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
+inline fn_internal V4U v4u_mul         (U32 lhs, V4U rhs)      { return (V4U) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
+inline fn_internal V4U v4u_div         (V4U lhs, U32 rhs)      { return (V4U) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
+inline fn_internal V4U v4u_add_u32     (V4U lhs, U32 rhs)      { return (V4U) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
+inline fn_internal V4U v4u_sub_u32     (V4U lhs, U32 rhs)      { return (V4U) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
+inline fn_internal V4U v4u_mul_u32     (V4U lhs, U32 rhs)      { return (V4U) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
 
-inline cb_function V4_U16 v4_u16_add         (V4_U16 lhs, V4_U16 rhs)   { return (V4_U16) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
-inline cb_function V4_U16 v4_u16_sub         (V4_U16 lhs, V4_U16 rhs)   { return (V4_U16) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
-inline cb_function V4_U16 v4_u16_had         (V4_U16 lhs, V4_U16 rhs)   { return (V4_U16) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
-inline cb_function V4_U16 v4_u16_mul         (U16 lhs, V4_U16 rhs)      { return (V4_U16) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
-inline cb_function V4_U16 v4_u16_div         (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
-inline cb_function V4_U16 v4_u16_add_u32     (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
-inline cb_function V4_U16 v4_u16_sub_u32     (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
-inline cb_function V4_U16 v4_u16_mul_u32     (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
+inline fn_internal V4_U16 v4_u16_add         (V4_U16 lhs, V4_U16 rhs)   { return (V4_U16) { lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w }; }
+inline fn_internal V4_U16 v4_u16_sub         (V4_U16 lhs, V4_U16 rhs)   { return (V4_U16) { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w};  }
+inline fn_internal V4_U16 v4_u16_had         (V4_U16 lhs, V4_U16 rhs)   { return (V4_U16) { lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w};  }
+inline fn_internal V4_U16 v4_u16_mul         (U16 lhs, V4_U16 rhs)      { return (V4_U16) { lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w };         }
+inline fn_internal V4_U16 v4_u16_div         (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs };         }
+inline fn_internal V4_U16 v4_u16_add_u32     (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs };         }
+inline fn_internal V4_U16 v4_u16_sub_u32     (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x - rhs, lhs.y - rhs, lhs.z - rhs, lhs.w - rhs };         }
+inline fn_internal V4_U16 v4_u16_mul_u32     (V4_U16 lhs, U16 rhs)      { return (V4_U16) { lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs };         }
 
 // NOTE(cmat): Floating Point Specific.
 
 #define NOZ_Epsilon 1.0e-6f
 
-inline cb_function F32 v2f_dot          (V2F lhs, V2F rhs)     { return lhs.x * rhs.x + lhs.y * rhs.y;                                 }
-inline cb_function F32 v3f_dot          (V3F lhs, V3F rhs)     { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;                 }
-inline cb_function F32 v4f_dot          (V4F lhs, V4F rhs)     { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z + lhs.w * rhs.w; }
+inline fn_internal F32 v2f_dot          (V2F lhs, V2F rhs)     { return lhs.x * rhs.x + lhs.y * rhs.y;                                 }
+inline fn_internal F32 v3f_dot          (V3F lhs, V3F rhs)     { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;                 }
+inline fn_internal F32 v4f_dot          (V4F lhs, V4F rhs)     { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z + lhs.w * rhs.w; }
 
-inline cb_function F32 v2f_len2         (V2F x)                { return v2f_dot(x, x); }
-inline cb_function F32 v3f_len2         (V3F x)                { return v3f_dot(x, x); }
-inline cb_function F32 v4f_len2         (V4F x)                { return v4f_dot(x, x); }
+inline fn_internal F32 v2f_len2         (V2F x)                { return v2f_dot(x, x); }
+inline fn_internal F32 v3f_len2         (V3F x)                { return v3f_dot(x, x); }
+inline fn_internal F32 v4f_len2         (V4F x)                { return v4f_dot(x, x); }
 
-inline cb_function F32 v2f_len          (V2F x)                { return f32_sqrt(v2f_len2(x)); }
-inline cb_function F32 v3f_len          (V3F x)                { return f32_sqrt(v3f_len2(x)); }
-inline cb_function F32 v4f_len          (V4F x)                { return f32_sqrt(v4f_len2(x)); }
+inline fn_internal F32 v2f_len          (V2F x)                { return f32_sqrt(v2f_len2(x)); }
+inline fn_internal F32 v3f_len          (V3F x)                { return f32_sqrt(v3f_len2(x)); }
+inline fn_internal F32 v4f_len          (V4F x)                { return f32_sqrt(v4f_len2(x)); }
 
-inline cb_function F32 v2f_dist         (V2F lhs, V2F rhs)     { return v2f_len(v2f_sub(lhs, rhs)); }
-inline cb_function F32 v3f_dist         (V3F lhs, V3F rhs)     { return v3f_len(v3f_sub(lhs, rhs)); }
-inline cb_function F32 v4f_dist         (V4F lhs, V4F rhs)     { return v4f_len(v4f_sub(lhs, rhs)); }
+inline fn_internal F32 v2f_dist         (V2F lhs, V2F rhs)     { return v2f_len(v2f_sub(lhs, rhs)); }
+inline fn_internal F32 v3f_dist         (V3F lhs, V3F rhs)     { return v3f_len(v3f_sub(lhs, rhs)); }
+inline fn_internal F32 v4f_dist         (V4F lhs, V4F rhs)     { return v4f_len(v4f_sub(lhs, rhs)); }
 
-inline cb_function V2F v2f_nor          (V2F x)                { return v2f_div(x, v2f_len(x)); }
-inline cb_function V3F v3f_nor          (V3F x)                { return v3f_div(x, v3f_len(x)); }
-inline cb_function V4F v4f_nor          (V4F x)                { return v4f_div(x, v4f_len(x)); }
+inline fn_internal V2F v2f_nor          (V2F x)                { return v2f_div(x, v2f_len(x)); }
+inline fn_internal V3F v3f_nor          (V3F x)                { return v3f_div(x, v3f_len(x)); }
+inline fn_internal V4F v4f_nor          (V4F x)                { return v4f_div(x, v4f_len(x)); }
 
-inline cb_function V2F v2f_noz          (V2F x)                { F32 len = v2f_len(x); return len <= NOZ_Epsilon ? v2f_f32(0.f) : v2f_div(x, len); }
-inline cb_function V3F v3f_noz          (V3F x)                { F32 len = v3f_len(x); return len <= NOZ_Epsilon ? v3f_f32(0.f) : v3f_div(x, len); }
-inline cb_function V4F v4f_noz          (V4F x)                { F32 len = v4f_len(x); return len <= NOZ_Epsilon ? v4f_f32(0.f) : v4f_div(x, len); }
+inline fn_internal V2F v2f_noz          (V2F x)                { F32 len = v2f_len(x); return len <= NOZ_Epsilon ? v2f_f32(0.f) : v2f_div(x, len); }
+inline fn_internal V3F v3f_noz          (V3F x)                { F32 len = v3f_len(x); return len <= NOZ_Epsilon ? v3f_f32(0.f) : v3f_div(x, len); }
+inline fn_internal V4F v4f_noz          (V4F x)                { F32 len = v4f_len(x); return len <= NOZ_Epsilon ? v4f_f32(0.f) : v4f_div(x, len); }
 
-inline cb_function V2F v2f_abs          (V2F x)                { return v2f(f32_abs(x.x), f32_abs(x.y));                             }
-inline cb_function V3F v3f_abs          (V3F x)                { return v3f(f32_abs(x.x), f32_abs(x.y), f32_abs(x.z));               }
-inline cb_function V4F v4f_abs          (V4F x)                { return v4f(f32_abs(x.x), f32_abs(x.y), f32_abs(x.z), f32_abs(x.w)); }
+inline fn_internal V2F v2f_abs          (V2F x)                { return v2f(f32_abs(x.x), f32_abs(x.y));                             }
+inline fn_internal V3F v3f_abs          (V3F x)                { return v3f(f32_abs(x.x), f32_abs(x.y), f32_abs(x.z));               }
+inline fn_internal V4F v4f_abs          (V4F x)                { return v4f(f32_abs(x.x), f32_abs(x.y), f32_abs(x.z), f32_abs(x.w)); }
 
-inline cb_function V2F v2f_saturate     (V2F x)                { return v2f(f32_clamp(x.x, 0.f, 1.f), f32_clamp(x.y, 0.f, 1.f));                                                     }
-inline cb_function V3F v3f_saturate     (V3F x)                { return v3f(f32_clamp(x.x, 0.f, 1.f), f32_clamp(x.y, 0.f, 1.f), f32_clamp(x.z, 0.f, 1.f));                           }
-inline cb_function V4F v4f_saturate     (V4F x)                { return v4f(f32_clamp(x.x, 0.f, 1.f), f32_clamp(x.y, 0.f, 1.f), f32_clamp(x.z, 0.f, 1.f), f32_clamp(x.w, 0.f, 1.f)); }
+inline fn_internal V2F v2f_saturate     (V2F x)                { return v2f(f32_clamp(x.x, 0.f, 1.f), f32_clamp(x.y, 0.f, 1.f));                                                     }
+inline fn_internal V3F v3f_saturate     (V3F x)                { return v3f(f32_clamp(x.x, 0.f, 1.f), f32_clamp(x.y, 0.f, 1.f), f32_clamp(x.z, 0.f, 1.f));                           }
+inline fn_internal V4F v4f_saturate     (V4F x)                { return v4f(f32_clamp(x.x, 0.f, 1.f), f32_clamp(x.y, 0.f, 1.f), f32_clamp(x.z, 0.f, 1.f), f32_clamp(x.w, 0.f, 1.f)); }
 
-inline cb_function V2F v2f_frac         (V2F x)                { return v2f(f32_fract(x.x), f32_fract(x.y));                                 }
-inline cb_function V3F v3f_frac         (V3F x)                { return v3f(f32_fract(x.x), f32_fract(x.y), f32_fract(x.z));                 }
-inline cb_function V4F v4f_frac         (V4F x)                { return v4f(f32_fract(x.x), f32_fract(x.y), f32_fract(x.z), f32_fract(x.w)); }
+inline fn_internal V2F v2f_frac         (V2F x)                { return v2f(f32_fract(x.x), f32_fract(x.y));                                 }
+inline fn_internal V3F v3f_frac         (V3F x)                { return v3f(f32_fract(x.x), f32_fract(x.y), f32_fract(x.z));                 }
+inline fn_internal V4F v4f_frac         (V4F x)                { return v4f(f32_fract(x.x), f32_fract(x.y), f32_fract(x.z), f32_fract(x.w)); }
 
-inline cb_function B32 v2f_all          (V2F x)                { return x.x != 0.f && x.y != 0.f;                             }
-inline cb_function B32 v3f_all          (V3F x)                { return x.x != 0.f && x.y != 0.f && x.z != 0.f;               }
-inline cb_function B32 v4f_all          (V4F x)                { return x.x != 0.f && x.y != 0.f && x.z != 0.f && x.w != 0.f; }
+inline fn_internal B32 v2f_all          (V2F x)                { return x.x != 0.f && x.y != 0.f;                             }
+inline fn_internal B32 v3f_all          (V3F x)                { return x.x != 0.f && x.y != 0.f && x.z != 0.f;               }
+inline fn_internal B32 v4f_all          (V4F x)                { return x.x != 0.f && x.y != 0.f && x.z != 0.f && x.w != 0.f; }
 
-inline cb_function B32 v2f_any          (V2F x)                { return x.x != 0.f || x.y != 0.f;                             }
-inline cb_function B32 v3f_any          (V3F x)                { return x.x != 0.f || x.y != 0.f || x.z != 0.f;               }
-inline cb_function B32 v4f_any          (V4F x)                { return x.x != 0.f || x.y != 0.f || x.z != 0.f || x.w != 0.f; }
+inline fn_internal B32 v2f_any          (V2F x)                { return x.x != 0.f || x.y != 0.f;                             }
+inline fn_internal B32 v3f_any          (V3F x)                { return x.x != 0.f || x.y != 0.f || x.z != 0.f;               }
+inline fn_internal B32 v4f_any          (V4F x)                { return x.x != 0.f || x.y != 0.f || x.z != 0.f || x.w != 0.f; }
 
-inline cb_function V2F v2f_reflect      (V2F in, V2F normal)   { return v2f_sub(in, v2f_mul( v2f_dot(in, normal), v2f_mul(2.f, normal))); }
-inline cb_function V3F v3f_reflect      (V3F in, V3F normal)   { return v3f_sub(in, v3f_mul( v3f_dot(in, normal), v3f_mul(2.f, normal))); }
-inline cb_function V4F v4f_reflect      (V4F in, V4F normal)   { return v4f_sub(in, v4f_mul( v4f_dot(in, normal), v4f_mul(2.f, normal))); }
+inline fn_internal V2F v2f_reflect      (V2F in, V2F normal)   { return v2f_sub(in, v2f_mul( v2f_dot(in, normal), v2f_mul(2.f, normal))); }
+inline fn_internal V3F v3f_reflect      (V3F in, V3F normal)   { return v3f_sub(in, v3f_mul( v3f_dot(in, normal), v3f_mul(2.f, normal))); }
+inline fn_internal V4F v4f_reflect      (V4F in, V4F normal)   { return v4f_sub(in, v4f_mul( v4f_dot(in, normal), v4f_mul(2.f, normal))); }
 
-inline cb_function V2F v2f_rcp          (V2F x)                { return v2f(1.f / x.x, 1.f / x.y);                       }
-inline cb_function V3F v3f_rcp          (V3F x)                { return v3f(1.f / x.x, 1.f / x.y, 1.f / x.z);            }
-inline cb_function V4F v4f_rcp          (V4F x)                { return v4f(1.f / x.x, 1.f / x.y, 1.f / x.z, 1.f / x.w); }
+inline fn_internal V2F v2f_rcp          (V2F x)                { return v2f(1.f / x.x, 1.f / x.y);                       }
+inline fn_internal V3F v3f_rcp          (V3F x)                { return v3f(1.f / x.x, 1.f / x.y, 1.f / x.z);            }
+inline fn_internal V4F v4f_rcp          (V4F x)                { return v4f(1.f / x.x, 1.f / x.y, 1.f / x.z, 1.f / x.w); }
 
 // NOTE(cmat): Cross only works in 3 and 5 dimensions.
-inline cb_function V3F v3f_cross(V3F lhs, V3F rhs) {
+inline fn_internal V3F v3f_cross(V3F lhs, V3F rhs) {
   return (V3F) {
     .x = lhs.y * rhs.z - lhs.z * rhs.y,
     .y = lhs.z * rhs.x - lhs.x * rhs.z,
@@ -1054,20 +1054,20 @@ typedef Array_Type(R3F) Array_R3F;
 // ------------------------------------------------------------
 // #-- Region Ops
 
-force_inline cb_function R2I r2i    (I32 x0, I32 y0, I32 x1, I32 y1) { return (R2I) { .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1, }; }
-force_inline cb_function R2F r2f    (F32 x0, F32 y0, F32 x1, F32 y1) { return (R2F) { .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1, }; }
-force_inline cb_function R2I r2i_v  (V2I min, V2I max)               { return (R2I) { .min = min, .max = max };                  }
-force_inline cb_function R2F r2f_v  (V2F min, V2F max)               { return (R2F) { .min = min, .max = max };                  }
+force_inline fn_internal R2I r2i    (I32 x0, I32 y0, I32 x1, I32 y1) { return (R2I) { .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1, }; }
+force_inline fn_internal R2F r2f    (F32 x0, F32 y0, F32 x1, F32 y1) { return (R2F) { .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1, }; }
+force_inline fn_internal R2I r2i_v  (V2I min, V2I max)               { return (R2I) { .min = min, .max = max };                  }
+force_inline fn_internal R2F r2f_v  (V2F min, V2F max)               { return (R2F) { .min = min, .max = max };                  }
 
-force_inline cb_function R3I r3i    (I32 x0, I32 y0, I32 z0, I32 x1, I32 y1, I32 z1)  { return (R3I) { .x0 = x0, .y0 = y0, .z0 = z0, .x1 = x1, .y1 = y1, .z1 = z1, }; }
-force_inline cb_function R3F r3f    (F32 x0, F32 y0, F32 z0, F32 x1, F32 y1, F32 z1)  { return (R3F) { .x0 = x0, .y0 = y0, .z0 = z0, .x1 = x1, .y1 = y1, .z1 = z1, }; }
-force_inline cb_function R3I r3i_v  (V3I min, V3I max)                                { return (R3I) { .min = min, .max = max };                                      }
-force_inline cb_function R3F r3f_v  (V3F min, V3F max)                                { return (R3F) { .min = min, .max = max };                                      }
+force_inline fn_internal R3I r3i    (I32 x0, I32 y0, I32 z0, I32 x1, I32 y1, I32 z1)  { return (R3I) { .x0 = x0, .y0 = y0, .z0 = z0, .x1 = x1, .y1 = y1, .z1 = z1, }; }
+force_inline fn_internal R3F r3f    (F32 x0, F32 y0, F32 z0, F32 x1, F32 y1, F32 z1)  { return (R3F) { .x0 = x0, .y0 = y0, .z0 = z0, .x1 = x1, .y1 = y1, .z1 = z1, }; }
+force_inline fn_internal R3I r3i_v  (V3I min, V3I max)                                { return (R3I) { .min = min, .max = max };                                      }
+force_inline fn_internal R3F r3f_v  (V3F min, V3F max)                                { return (R3F) { .min = min, .max = max };                                      }
 
 // ------------------------------------------------------------
 // #-- Matrix Ops
 
-inline cb_function M2F m2f_id(void) {
+inline fn_internal M2F m2f_id(void) {
   M2F result;
   zero_fill(&result);
   result.e11 = 1;
@@ -1075,7 +1075,7 @@ inline cb_function M2F m2f_id(void) {
   return result;
 }
 
-inline cb_function M3F m3f_id(void) {
+inline fn_internal M3F m3f_id(void) {
   M3F result;
   zero_fill(&result);
   result.e11 = 1;
@@ -1084,7 +1084,7 @@ inline cb_function M3F m3f_id(void) {
   return result;
 }
 
-inline cb_function M4F m4f_id(void) {
+inline fn_internal M4F m4f_id(void) {
   M4F result;
   zero_fill(&result);
   result.e11 = 1;
@@ -1153,7 +1153,7 @@ V4F m4f_mul_v4f(M4F lhs, V4F rhs) {
   return result;
 }
 
-inline cb_function M2F m2f_trans(M2F x) {
+inline fn_internal M2F m2f_trans(M2F x) {
   M2F result = {};
   zero_fill(&result);
 
@@ -1166,7 +1166,7 @@ inline cb_function M2F m2f_trans(M2F x) {
   return result;
 }
 
-inline cb_function M3F m3f_trans(M3F x) {
+inline fn_internal M3F m3f_trans(M3F x) {
   M3F result = {};
   zero_fill(&result);
 
@@ -1179,7 +1179,7 @@ inline cb_function M3F m3f_trans(M3F x) {
   return result;
 }
 
-inline cb_function M4F m4f_trans(M4F x) {
+inline fn_internal M4F m4f_trans(M4F x) {
   M4F result = {};
   zero_fill(&result);
 
@@ -1192,7 +1192,7 @@ inline cb_function M4F m4f_trans(M4F x) {
   return result;
 }
 
-inline cb_function M2F m2f_add(M2F lhs, M2F rhs) {
+inline fn_internal M2F m2f_add(M2F lhs, M2F rhs) {
   M2F result = { };
   For_U32(it, 2*2) {
     result.dat[it] = lhs.dat[it] + rhs.dat[it];
@@ -1201,7 +1201,7 @@ inline cb_function M2F m2f_add(M2F lhs, M2F rhs) {
   return result;
 }
 
-inline cb_function M3F m3f_add(M3F lhs, M3F rhs) {
+inline fn_internal M3F m3f_add(M3F lhs, M3F rhs) {
   M3F result = { };
   For_U32(it, 3*3) {
     result.dat[it] = lhs.dat[it] + rhs.dat[it];
@@ -1210,7 +1210,7 @@ inline cb_function M3F m3f_add(M3F lhs, M3F rhs) {
   return result;
 }
 
-inline cb_function M4F m4f_add(M4F lhs, M4F rhs) {
+inline fn_internal M4F m4f_add(M4F lhs, M4F rhs) {
   M4F result = { };
   For_U32(it, 4*4) {
     result.dat[it] = lhs.dat[it] + rhs.dat[it];
@@ -1219,7 +1219,7 @@ inline cb_function M4F m4f_add(M4F lhs, M4F rhs) {
   return result;
 }
 
-inline cb_function M2F m2f_sub(M2F lhs, M2F rhs) {
+inline fn_internal M2F m2f_sub(M2F lhs, M2F rhs) {
   M2F result = { };
   For_U32(it, 2*2) {
     result.dat[it] = lhs.dat[it] - rhs.dat[it];
@@ -1228,7 +1228,7 @@ inline cb_function M2F m2f_sub(M2F lhs, M2F rhs) {
   return result;
 }
 
-inline cb_function M3F m3f_sub(M3F lhs, M3F rhs) {
+inline fn_internal M3F m3f_sub(M3F lhs, M3F rhs) {
   M3F result = { };
   For_U32(it, 3*3) {
     result.dat[it] = lhs.dat[it] - rhs.dat[it];
@@ -1237,7 +1237,7 @@ inline cb_function M3F m3f_sub(M3F lhs, M3F rhs) {
   return result;
 }
 
-inline cb_function M4F m4f_sub(M4F lhs, M4F rhs) {
+inline fn_internal M4F m4f_sub(M4F lhs, M4F rhs) {
   M4F result = { };
   For_U32(it, 4*4) {
     result.dat[it] = lhs.dat[it] - rhs.dat[it];
@@ -1246,7 +1246,7 @@ inline cb_function M4F m4f_sub(M4F lhs, M4F rhs) {
   return result;
 }
 
-inline cb_function M2F m2f_had(M2F lhs, M2F rhs) {
+inline fn_internal M2F m2f_had(M2F lhs, M2F rhs) {
   M2F result = { };
   For_U32(it, 2*2) {
     result.dat[it] = lhs.dat[it] * rhs.dat[it];
@@ -1255,7 +1255,7 @@ inline cb_function M2F m2f_had(M2F lhs, M2F rhs) {
   return result;
 }
 
-inline cb_function M3F m3f_had(M3F lhs, M3F rhs) {
+inline fn_internal M3F m3f_had(M3F lhs, M3F rhs) {
   M3F result = { };
   For_U32(it, 3*3) {
     result.dat[it] = lhs.dat[it] * rhs.dat[it];
@@ -1264,7 +1264,7 @@ inline cb_function M3F m3f_had(M3F lhs, M3F rhs) {
   return result;
 }
 
-inline cb_function M4F m4f_had(M4F lhs, M4F rhs) {
+inline fn_internal M4F m4f_had(M4F lhs, M4F rhs) {
   M4F result = { };
   For_U32(it, 4*4) {
     result.dat[it] = lhs.dat[it] * rhs.dat[it];
@@ -1273,7 +1273,7 @@ inline cb_function M4F m4f_had(M4F lhs, M4F rhs) {
   return result;
 }
 
-inline cb_function M2F m2f_mul_f32(F32 lhs, M2F rhs) {
+inline fn_internal M2F m2f_mul_f32(F32 lhs, M2F rhs) {
   M2F result = { };
   For_U32(it, 2*2) {
     result.dat[it] = lhs * rhs.dat[it];
@@ -1282,7 +1282,7 @@ inline cb_function M2F m2f_mul_f32(F32 lhs, M2F rhs) {
   return result;
 }
 
-inline cb_function M3F m3f_mul_f32(F32 lhs, M3F rhs) {
+inline fn_internal M3F m3f_mul_f32(F32 lhs, M3F rhs) {
   M3F result = { };
   For_U32(it, 3*3) {
     result.dat[it] = lhs * rhs.dat[it];
@@ -1291,7 +1291,7 @@ inline cb_function M3F m3f_mul_f32(F32 lhs, M3F rhs) {
   return result;
 }
 
-inline cb_function M4F m4f_mul_f32(F32 lhs, M4F rhs) {
+inline fn_internal M4F m4f_mul_f32(F32 lhs, M4F rhs) {
   M4F result = { };
   For_U32(it, 4*4) {
     result.dat[it] = lhs * rhs.dat[it];
@@ -1300,7 +1300,7 @@ inline cb_function M4F m4f_mul_f32(F32 lhs, M4F rhs) {
   return result;
 }
 
-inline cb_function M2F m2f_div_f32(M2F lhs, F32 rhs) {
+inline fn_internal M2F m2f_div_f32(M2F lhs, F32 rhs) {
   M2F result = { };
   For_U32(it, 2*2) {
     result.dat[it] = lhs.dat[it] / rhs;
@@ -1309,7 +1309,7 @@ inline cb_function M2F m2f_div_f32(M2F lhs, F32 rhs) {
   return result;
 }
 
-inline cb_function M3F m3f_div_f32(M3F lhs, F32 rhs) {
+inline fn_internal M3F m3f_div_f32(M3F lhs, F32 rhs) {
   M3F result = { };
   For_U32(it, 3*3) {
     result.dat[it] = lhs.dat[it] / rhs;
@@ -1318,7 +1318,7 @@ inline cb_function M3F m3f_div_f32(M3F lhs, F32 rhs) {
   return result;
 }
 
-inline cb_function M4F m4f_div_f32(M4F lhs, F32 rhs) {
+inline fn_internal M4F m4f_div_f32(M4F lhs, F32 rhs) {
   M4F result = { };
   For_U32(it, 4*4) {
     result.dat[it] = lhs.dat[it] / rhs;
@@ -1327,14 +1327,14 @@ inline cb_function M4F m4f_div_f32(M4F lhs, F32 rhs) {
   return result;
 }
 
-inline cb_function F32 m2f_trace(M2F x) { return x.e11 + x.e22; }
-inline cb_function F32 m3f_trace(M3F x) { return x.e11 + x.e22 + x.e33; }
-inline cb_function F32 m4f_trace(M4F x) { return x.e11 + x.e22 + x.e33 + x.e44; }
+inline fn_internal F32 m2f_trace(M2F x) { return x.e11 + x.e22; }
+inline fn_internal F32 m3f_trace(M3F x) { return x.e11 + x.e22 + x.e33; }
+inline fn_internal F32 m4f_trace(M4F x) { return x.e11 + x.e22 + x.e33 + x.e44; }
 
-cb_function F32 m2f_det(M2F x);
-cb_function F32 m3f_det(M3F x);
-cb_function F32 m4f_det(M4F x);
-cb_function B32 m4f_inv(M4F x, M4F *solved);
+fn_internal F32 m2f_det(M2F x);
+fn_internal F32 m3f_det(M3F x);
+fn_internal F32 m4f_det(M4F x);
+fn_internal B32 m4f_inv(M4F x, M4F *solved);
 
 // ------------------------------------------------------------
 // #-- Color Spaces
@@ -1352,53 +1352,53 @@ typedef HSV_F32 HSV;
 typedef RGBA_F32 RGBA;
 typedef HSVA_F32 HSVA;
 
-cb_function RGB       rgb_from_hsv       (HSV rgb);
-cb_function HSV       hsv_from_rgb       (RGB hsv);
-cb_function RGBA      rgba_from_hsva     (HSVA rgb);
-cb_function HSVA      hsva_from_rgba     (RGBA hsv);
-cb_function RGBA_U32  rgba_u32_from_rgba (RGBA_F32 rgba);
-cb_function RGBA_U32  abgr_u32_from_rgba (RGBA_F32 rgba);
+fn_internal RGB       rgb_from_hsv       (HSV rgb);
+fn_internal HSV       hsv_from_rgb       (RGB hsv);
+fn_internal RGBA      rgba_from_hsva     (HSVA rgb);
+fn_internal HSVA      hsva_from_rgba     (RGBA hsv);
+fn_internal RGBA_U32  rgba_u32_from_rgba (RGBA_F32 rgba);
+fn_internal RGBA_U32  abgr_u32_from_rgba (RGBA_F32 rgba);
 
 // ------------------------------------------------------------
 // #-- Interpolation
 
-inline cb_function F32 f32_lerp  (F32 t, F32 a, F32 b)  { return (1.f - t) * a + b;                    }
-inline cb_function V2F v2f_lerp  (F32 t, V2F a, V2F b)  { return v2f_add(v2f_mul((1.f - t), a), b);    }
-inline cb_function V3F v3f_lerp  (F32 t, V3F a, V3F b)  { return v3f_add(v3f_mul((1.f - t), a), b);    }
-inline cb_function V4F v4f_lerp  (F32 t, V4F a, V4F b)  { return v4f_add(v4f_mul((1.f - t), a), b);    }
+inline fn_internal F32 f32_lerp  (F32 t, F32 a, F32 b)  { return (1.f - t) * a + b;                    }
+inline fn_internal V2F v2f_lerp  (F32 t, V2F a, V2F b)  { return v2f_add(v2f_mul((1.f - t), a), b);    }
+inline fn_internal V3F v3f_lerp  (F32 t, V3F a, V3F b)  { return v3f_add(v3f_mul((1.f - t), a), b);    }
+inline fn_internal V4F v4f_lerp  (F32 t, V4F a, V4F b)  { return v4f_add(v4f_mul((1.f - t), a), b);    }
 
 #define rgb_lerp  v3f_lerp
 #define rgba_lerp v4f_lerp
 #define hsv_lerp  v3f_lerp
 #define hsva_lerp v4f_lerp
 
-inline cb_function F32 f32_smoothstep (F32 t, F32 a, F32 b) {
+inline fn_internal F32 f32_smoothstep (F32 t, F32 a, F32 b) {
   t = f32_clamp((t - a) / (b - a), 0, 1);
   return t * t * (3.f - 2.f * t);
 }
 
-inline cb_function V2F v2f_smoothstep (F32 t, V2F a, V2F b) {
+inline fn_internal V2F v2f_smoothstep (F32 t, V2F a, V2F b) {
   return v2f(f32_smoothstep(t, a.x, b.x), f32_smoothstep(t, a.y, b.y));
 }
 
-inline cb_function V3F v3f_smoothstep (F32 t, V3F a, V3F b) {
+inline fn_internal V3F v3f_smoothstep (F32 t, V3F a, V3F b) {
   return v3f(f32_smoothstep(t, a.x, b.x), f32_smoothstep(t, a.y, b.y), f32_smoothstep(t, a.z, b.z));
 }
 
-inline cb_function V4F v4f_smoothstep (F32 t, V4F a, V4F b) {
+inline fn_internal V4F v4f_smoothstep (F32 t, V4F a, V4F b) {
   return v4f(f32_smoothstep(t, a.x, b.x), f32_smoothstep(t, a.y, b.y), f32_smoothstep(t, a.z, b.z), f32_smoothstep(t, a.w, b.w));
 }
 
 // ------------------------------------------------------------
 // #-- Interpolation
 
-cb_function V2F v2f_spline_catmull(F32 t, V2F p1, V2F p2, V2F p3, V2F p4);
-cb_function V3F v3f_spline_catmull(F32 t, V3F p1, V3F p2, V3F p3, V3F p4);
-cb_function V4F v4f_spline_catmull(F32 t, V4F p1, V4F p2, V4F p3, V4F p4);
+fn_internal V2F v2f_spline_catmull(F32 t, V2F p1, V2F p2, V2F p3, V2F p4);
+fn_internal V3F v3f_spline_catmull(F32 t, V3F p1, V3F p2, V3F p3, V3F p4);
+fn_internal V4F v4f_spline_catmull(F32 t, V4F p1, V4F p2, V4F p3, V4F p4);
 
-cb_function V2F v2f_spline_catmull_dt(F32 t, V2F p1, V2F p2, V2F p3, V2F p4);
-cb_function V3F v3f_spline_catmull_dt(F32 t, V3F p1, V3F p2, V3F p3, V3F p4);
-cb_function V4F v4f_spline_catmull_dt(F32 t, V4F p1, V4F p2, V4F p3, V4F p4);
+fn_internal V2F v2f_spline_catmull_dt(F32 t, V2F p1, V2F p2, V2F p3, V2F p4);
+fn_internal V3F v3f_spline_catmull_dt(F32 t, V3F p1, V3F p2, V3F p3, V3F p4);
+fn_internal V4F v4f_spline_catmull_dt(F32 t, V4F p1, V4F p2, V4F p3, V4F p4);
 
 // ------------------------------------------------------------
 // #-- Pseudo-Random Number Generation
@@ -1406,7 +1406,7 @@ cb_function V4F v4f_spline_catmull_dt(F32 t, V4F p1, V4F p2, V4F p3, V4F p4);
 typedef U64 Random_Seed;
 
 // NOTE(cmat): XORSHIFT implementation.
-inline cb_function U64 random_next (Random_Seed *seed) {
+inline fn_internal U64 random_next (Random_Seed *seed) {
   U64 x = *seed;
   x ^= x << 13;
   x ^= x >> 7;
@@ -1417,22 +1417,22 @@ inline cb_function U64 random_next (Random_Seed *seed) {
 }
 
 // NOTE(cmat): Random values in the range: [min, max].
-inline cb_function U64 i64_random            (Random_Seed *seed, I64 min, I64 max) { return min + (I64)(random_next(seed) % (U64)(max - min + 1)); }
-inline cb_function U64 u64_random            (Random_Seed *seed, U64 min, U64 max) { return min + (U64)(random_next(seed) % (U64)(max - min + 1)); }
+inline fn_internal U64 i64_random            (Random_Seed *seed, I64 min, I64 max) { return min + (I64)(random_next(seed) % (U64)(max - min + 1)); }
+inline fn_internal U64 u64_random            (Random_Seed *seed, U64 min, U64 max) { return min + (U64)(random_next(seed) % (U64)(max - min + 1)); }
  
 // NOTE(cmat): Random unilateral values (between [0, 1]).
-inline cb_function F32 f32_random_unilateral (Random_Seed *seed) { return (F32)random_next(seed) / (F32)u64_limit_max;                                                                               }
-inline cb_function F64 f64_random_unilateral (Random_Seed *seed) { return (F64)random_next(seed) / (F64)u64_limit_max;                                                                               }
-inline cb_function V2F v2f_random_unilateral (Random_Seed *seed) { return v2f(f32_random_unilateral(seed), f32_random_unilateral(seed));                                                             }
-inline cb_function V3F v3f_random_unilateral (Random_Seed *seed) { return v3f(f32_random_unilateral(seed), f32_random_unilateral(seed),  f32_random_unilateral(seed));                               }
-inline cb_function V4F v4f_random_unilateral (Random_Seed *seed) { return v4f(f32_random_unilateral(seed), f32_random_unilateral(seed),  f32_random_unilateral(seed), f32_random_unilateral(seed));  }
+inline fn_internal F32 f32_random_unilateral (Random_Seed *seed) { return (F32)random_next(seed) / (F32)u64_limit_max;                                                                               }
+inline fn_internal F64 f64_random_unilateral (Random_Seed *seed) { return (F64)random_next(seed) / (F64)u64_limit_max;                                                                               }
+inline fn_internal V2F v2f_random_unilateral (Random_Seed *seed) { return v2f(f32_random_unilateral(seed), f32_random_unilateral(seed));                                                             }
+inline fn_internal V3F v3f_random_unilateral (Random_Seed *seed) { return v3f(f32_random_unilateral(seed), f32_random_unilateral(seed),  f32_random_unilateral(seed));                               }
+inline fn_internal V4F v4f_random_unilateral (Random_Seed *seed) { return v4f(f32_random_unilateral(seed), f32_random_unilateral(seed),  f32_random_unilateral(seed), f32_random_unilateral(seed));  }
 
 // NOTE(cmat): Random bilateral values (between [-1, 1]).
-inline cb_function F32 f32_random_bilateral  (Random_Seed *seed) { return 2.f * f32_random_unilateral(seed) - 1.f;                                                                                   }
-inline cb_function F64 f64_random_bilateral  (Random_Seed *seed) { return 2.  * f64_random_unilateral(seed) - 1.;                                                                                    }
-inline cb_function V2F v2f_random_bilateral  (Random_Seed *seed) { return v2f(f32_random_bilateral (seed), f32_random_bilateral (seed));                                                             }
-inline cb_function V3F v3f_random_bilateral  (Random_Seed *seed) { return v3f(f32_random_bilateral (seed), f32_random_bilateral (seed),  f32_random_bilateral (seed));                               }
-inline cb_function V4F v4f_random_bilateral  (Random_Seed *seed) { return v4f(f32_random_bilateral (seed), f32_random_bilateral (seed),  f32_random_bilateral (seed),  f32_random_bilateral(seed));  }
+inline fn_internal F32 f32_random_bilateral  (Random_Seed *seed) { return 2.f * f32_random_unilateral(seed) - 1.f;                                                                                   }
+inline fn_internal F64 f64_random_bilateral  (Random_Seed *seed) { return 2.  * f64_random_unilateral(seed) - 1.;                                                                                    }
+inline fn_internal V2F v2f_random_bilateral  (Random_Seed *seed) { return v2f(f32_random_bilateral (seed), f32_random_bilateral (seed));                                                             }
+inline fn_internal V3F v3f_random_bilateral  (Random_Seed *seed) { return v3f(f32_random_bilateral (seed), f32_random_bilateral (seed),  f32_random_bilateral (seed));                               }
+inline fn_internal V4F v4f_random_bilateral  (Random_Seed *seed) { return v4f(f32_random_bilateral (seed), f32_random_bilateral (seed),  f32_random_bilateral (seed),  f32_random_bilateral(seed));  }
 
 // ------------------------------------------------------------
 // #-- SIMD
@@ -1452,18 +1452,18 @@ typedef struct {
 } Mask_X04;
 
 // NOTE(cmat): Basic 4x wide ops
-force_inline F32_X04  f32_x04_load                        (F32 *ptr)                                { return (F32_X04)                              { .simd = vld1q_f32(ptr) }; }
-force_inline F32_X04  f32_x04_load_f32                    (F32 x)                                   { F32 ptr[4] = { x, x, x, x }; return (F32_X04) { .simd = vld1q_f32(ptr) }; }
+force_inline fn_internal F32_X04  f32_x04_load                        (F32 *ptr)                                { return (F32_X04)                              { .simd = vld1q_f32(ptr) }; }
+force_inline fn_internal F32_X04  f32_x04_load_f32                    (F32 x)                                   { F32 ptr[4] = { x, x, x, x }; return (F32_X04) { .simd = vld1q_f32(ptr) }; }
 
-force_inline F32_X04  f32_x04_add                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vaddq_f32(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_sub                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vsubq_f32(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_mul                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vmulq_f32(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_div                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vdivq_f32(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_square_root                 (F32_X04 x)                               { return (F32_X04)  { .simd = vsqrtq_f32(x.simd) }; }
-force_inline F32_X04  f32_x04_fused_mul_add               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = vfmaq_f32(c.simd, b.simd, a.simd) }; }
-force_inline F32_X04  f32_x04_fused_mul_sub               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = vfmsq_f32(c.simd, b.simd, a.simd) }; }
-force_inline Mask_X04 f32_x04_mask_greater_than_or_equal  (F32_X04 lhs, F32_X04 rhs)                { return (Mask_X04) { .simd = vcgeq_f32(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_blend                       (F32_X04 a, F32_X04 b, Mask_X04 mask)     { return (F32_X04)  { .simd = vbslq_f32(mask.simd, a.simd, b.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_add                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vaddq_f32(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_sub                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vsubq_f32(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_mul                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vmulq_f32(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_div                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = vdivq_f32(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_square_root                 (F32_X04 x)                               { return (F32_X04)  { .simd = vsqrtq_f32(x.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_fused_mul_add               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = vfmaq_f32(c.simd, b.simd, a.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_fused_mul_sub               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = vfmsq_f32(c.simd, b.simd, a.simd) }; }
+force_inline fn_internal Mask_X04 f32_x04_mask_greater_than_or_equal  (F32_X04 lhs, F32_X04 rhs)                { return (Mask_X04) { .simd = vcgeq_f32(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_blend                       (F32_X04 a, F32_X04 b, Mask_X04 mask)     { return (F32_X04)  { .simd = vbslq_f32(mask.simd, a.simd, b.simd) }; }
 
 #elif ARCH_X86
 #include <immintrin.h>
@@ -1479,23 +1479,23 @@ typedef struct {
 } Mask_X04;
 
 // NOTE(cmat): Basic 4x wide ops
-force_inline F32_X04  f32_x04_load                        (F32 *ptr)                                { return (F32_X04)  { .simd = _mm_load_ps(ptr) }; }
-force_inline F32_X04  f32_x04_load_f32                    (F32 x)                                   { return (F32_X04)  { .simd = _mm_set1_ps(x) }; }
+force_inline fn_internal F32_X04  f32_x04_load                        (F32 *ptr)                                { return (F32_X04)  { .simd = _mm_load_ps(ptr) }; }
+force_inline fn_internal F32_X04  f32_x04_load_f32                    (F32 x)                                   { return (F32_X04)  { .simd = _mm_set1_ps(x) }; }
 
-force_inline F32_X04  f32_x04_add                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_add_ps(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_sub                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_sub_ps(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_mul                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_mul_ps(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_div                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_div_ps(lhs.simd, rhs.simd) }; }
-force_inline F32_X04  f32_x04_square_root                 (F32_X04 x)                               { return (F32_X04)  { .simd = _mm_sqrt_ps(x.simd) }; }
-force_inline F32_X04  f32_x04_fused_mul_add               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = _mm_fmadd_ps(a.simd, b.simd, c.simd) }; }
-force_inline F32_X04  f32_x04_fused_mul_sub               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = _mm_fmsub_ps(a.simd, b.simd, c.simd) }; }
-force_inline Mask_X04 f32_x04_mask_greater_than_or_equal  (F32_X04 lhs, F32_X04 rhs)                { return (Mask_X04) { .simd = _mm_cmp_ps_mask(lhs.simd, rhs.simd, _CMP_GE_OQ) }; }
-force_inline F32_X04  f32_x04_blend                       (F32_X04 a, F32_X04 b, Mask_X04 mask)     { return (F32_X04)  { .simd = _mm_mask_blend_ps(mask.simd, a.simd, b.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_add                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_add_ps(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_sub                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_sub_ps(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_mul                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_mul_ps(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_div                         (F32_X04 lhs, F32_X04 rhs)                { return (F32_X04)  { .simd = _mm_div_ps(lhs.simd, rhs.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_square_root                 (F32_X04 x)                               { return (F32_X04)  { .simd = _mm_sqrt_ps(x.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_fused_mul_add               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = _mm_fmadd_ps(a.simd, b.simd, c.simd) }; }
+force_inline fn_internal F32_X04  f32_x04_fused_mul_sub               (F32_X04 a, F32_X04 b, F32_X04 c)         { return (F32_X04)  { .simd = _mm_fmsub_ps(a.simd, b.simd, c.simd) }; }
+force_inline fn_internal Mask_X04 f32_x04_mask_greater_than_or_equal  (F32_X04 lhs, F32_X04 rhs)                { return (Mask_X04) { .simd = _mm_cmp_ps_mask(lhs.simd, rhs.simd, _CMP_GE_OQ) }; }
+force_inline fn_internal F32_X04  f32_x04_blend                       (F32_X04 a, F32_X04 b, Mask_X04 mask)     { return (F32_X04)  { .simd = _mm_mask_blend_ps(mask.simd, a.simd, b.simd) }; }
 
 #endif
 
 // ------------------------------------------------------------
 // #-- Entry Point
 
-cb_function void base_entry_point(Array_Str command_line);
+fn_internal void base_entry_point(Array_Str command_line);
 

@@ -35,7 +35,7 @@ typedef struct FO_Font {
   U32           *ascii_range_from;
 } FO_Font;
 
-inline cb_function FO_Font font_load(Arena *arena, char *font_atlas, char *font_glyph_map) { 
+inline fn_internal FO_Font font_load(Arena *arena, char *font_atlas, char *font_glyph_map) { 
   FO_Font font;
   zero_fill(&font);
 
@@ -76,7 +76,7 @@ inline cb_function FO_Font font_load(Arena *arena, char *font_atlas, char *font_
   return font;
 }
 
-inline cb_function F32 font_text_width(FO_Font *font, Str string, F32 scale) {
+inline fn_internal F32 font_text_width(FO_Font *font, Str string, F32 scale) {
   F32 text_width = 0;
   For_U32 (it, string.len) {
     FO_Font_Glyph *g = &font->glyph_array[string.txt[it] - 32];

@@ -4,9 +4,13 @@
 // ------------------------------------------------------------
 // #-- Codebase Markup
 
-#define cb_function       static
-#define cb_global         static
-#define cb_local_persist  static
+#define fn_internal        static
+#define fn_external        extern
+#define fn_entry
+
+#define var_global         static
+#define var_external       extern
+#define var_local_persist  static
 
 // ------------------------------------------------------------
 // #-- Build Flags
@@ -226,32 +230,36 @@ typedef I64 B64;
 
 typedef struct Str {
   U64  len;
-  I08 *txt;
+  U08 *txt;
 } Str;
 
-#define str_lit(literal_) ((Str) { .txt = (I08 *)(literal_), .len = sizeof(literal_) - 1 })
+#define str_lit(literal_) ((Str) { .txt = (U08 *)(literal_), .len = sizeof(literal_) - 1 })
 #define str_expand(str_) ((U32)(str_.len)), (str_.txt)
 
-force_inline cb_function Str str(U64 len, I08 *txt) { return (Str) { .len = len, .txt =txt }; }
+force_inline fn_internal Str str(U64 len, U08 *txt) { return (Str) { .len = len, .txt = txt }; }
 
 // ------------------------------------------------------------
 // #-- Strings Base Operations
-cb_function U64 cstring_len              (char *cstring);
 
-cb_function Str str_slice                 (Str base, U64 start, U64 len);
-cb_function Str str_from_cstr             (char *cstring);
-cb_function Str str_trim                  (Str string);
-cb_function B32 str_equals                (Str lhs, Str rhs);
-cb_function B32 str_starts_with           (Str base, Str start);
-cb_function B32 str_contains              (Str base, Str sub);
-cb_function B32 str_equals_any_case       (Str lhs, Str rhs);
-cb_function B32 str_starts_with_any_case  (Str base, Str start);
-cb_function B32 str_contains_any_case     (Str base, Str sub);
-cb_function U64 str_hash                  (Str string);
+fn_internal U64 cstring_len               (char *cstring);
 
-cb_function I64 i64_from_str              (Str string);
-cb_function F64 f64_from_str              (Str string);
-cb_function B32 b32_from_str              (Str string);
+fn_internal Str str_slice                 (Str base, U64 start, U64 len);
+fn_internal Str str_from_cstr             (char *cstring);
+fn_internal Str str_trim                  (Str string);
+fn_internal B32 str_equals                (Str lhs, Str rhs);
+fn_internal B32 str_starts_with           (Str base, Str start);
+fn_internal B32 str_contains              (Str base, Str sub);
+fn_internal B32 str_equals_any_case       (Str lhs, Str rhs);
+fn_internal B32 str_starts_with_any_case  (Str base, Str start);
+fn_internal B32 str_contains_any_case     (Str base, Str sub);
+fn_internal U64 str_hash                  (Str string);
+
+fn_internal I64 i64_from_str              (Str string);
+fn_internal F64 f64_from_str              (Str string);
+fn_internal B32 b32_from_str              (Str string);
+
+typedef U32 Codepoint;
+fn_internal Codepoint codepoint_from_utf8(Str str_utf8, I32 *advance);
 
 // ------------------------------------------------------------
 // #-- Meta-Data Collection
@@ -311,18 +319,18 @@ typedef struct {
 // #-- Memory Operations
 
 #if COMPILER_CLANG || COMPILER_GCC
-force_inline cb_function void memory_copy    (void *dst, void *src, U64 bytes) { __builtin_memcpy(dst, src, bytes); }
-force_inline cb_function void memory_fill    (void *dst, U08 fill, U64 bytes)  { __builtin_memset(dst, fill, bytes); }
-force_inline cb_function B32  memory_compare (void *lhs, void *rhs, U64 bytes) { return __builtin_memcmp(lhs, rhs, bytes) == 0; }
+force_inline fn_internal void memory_copy    (void *dst, void *src, U64 bytes) { __builtin_memcpy(dst, src, bytes); }
+force_inline fn_internal void memory_fill    (void *dst, U08 fill, U64 bytes)  { __builtin_memset(dst, fill, bytes); }
+force_inline fn_internal B32  memory_compare (void *lhs, void *rhs, U64 bytes) { return __builtin_memcmp(lhs, rhs, bytes) == 0; }
 
 #elif COMPILER_MSVC
 # pragma intrinsic(__movsb)
 # pragma intrinsic(__stosb)
 
-force_inline cb_function void memory_copy    (void *dst, void *src, U64 bytes) { __movsb(dst, src, bytes); }
-force_inline cb_function void memory_fill    (void *dst, U08 fill, U64 bytes)  { __stosb(dst, fill, bytes); }
+force_inline fn_internal void memory_copy    (void *dst, void *src, U64 bytes) { __movsb(dst, src, bytes); }
+force_inline fn_internal void memory_fill    (void *dst, U08 fill, U64 bytes)  { __stosb(dst, fill, bytes); }
 
-inline cb_function B32 memory_compare (void *lhs, void *rhs, U64 bytes) {
+inline fn_internal B32 memory_compare (void *lhs, void *rhs, U64 bytes) {
   U08 *a = (U08 *)lhs;
   U08 *b = (U08 *)rhs;
 
@@ -342,24 +350,24 @@ inline cb_function B32 memory_compare (void *lhs, void *rhs, U64 bytes) {
 // #-- Atomic Operations
 
 #if COMPILER_GCC || COMPILER_CLANG
-force_inline cb_function U32   atomic_read_u32       (volatile U32 *x)             { return __atomic_load_n(x, __ATOMIC_SEQ_CST);              }
-force_inline cb_function I32   atomic_read_i32       (volatile I32 *x)             { return __atomic_load_n(x, __ATOMIC_SEQ_CST);              }
-force_inline cb_function U32   atomic_write_u32      (volatile U32 *x, U32 value)  { return __atomic_exchange_n(x, value, __ATOMIC_SEQ_CST);   }
-force_inline cb_function I32   atomic_write_i32      (volatile I32 *x, I32 value)  { return __atomic_exchange_n(x, value, __ATOMIC_SEQ_CST);   }
-force_inline cb_function U32   atomic_increment_u32  (volatile U32 *x)             { return __atomic_fetch_add(x, 1, __ATOMIC_SEQ_CST) + 1;    }
-force_inline cb_function I32   atomic_increment_i32  (volatile I32 *x)             { return __atomic_fetch_add(x, 1, __ATOMIC_SEQ_CST) + 1;    }
-force_inline cb_function U32   atomic_decrement_u32  (volatile U32 *x)             { return __atomic_fetch_sub(x, 1, __ATOMIC_SEQ_CST) - 1;    }
-force_inline cb_function I32   atomic_decrement_i32  (volatile I32 *x)             { return __atomic_fetch_sub(x, 1, __ATOMIC_SEQ_CST) - 1;    }
+force_inline fn_internal U32   atomic_read_u32       (volatile U32 *x)             { return __atomic_load_n(x, __ATOMIC_SEQ_CST);              }
+force_inline fn_internal I32   atomic_read_i32       (volatile I32 *x)             { return __atomic_load_n(x, __ATOMIC_SEQ_CST);              }
+force_inline fn_internal U32   atomic_write_u32      (volatile U32 *x, U32 value)  { return __atomic_exchange_n(x, value, __ATOMIC_SEQ_CST);   }
+force_inline fn_internal I32   atomic_write_i32      (volatile I32 *x, I32 value)  { return __atomic_exchange_n(x, value, __ATOMIC_SEQ_CST);   }
+force_inline fn_internal U32   atomic_increment_u32  (volatile U32 *x)             { return __atomic_fetch_add(x, 1, __ATOMIC_SEQ_CST) + 1;    }
+force_inline fn_internal I32   atomic_increment_i32  (volatile I32 *x)             { return __atomic_fetch_add(x, 1, __ATOMIC_SEQ_CST) + 1;    }
+force_inline fn_internal U32   atomic_decrement_u32  (volatile U32 *x)             { return __atomic_fetch_sub(x, 1, __ATOMIC_SEQ_CST) - 1;    }
+force_inline fn_internal I32   atomic_decrement_i32  (volatile I32 *x)             { return __atomic_fetch_sub(x, 1, __ATOMIC_SEQ_CST) - 1;    }
 
 #elif COMPILER_MSVC
-force_inline cb_function U32   atomic_read_u32       (volatile U32 *x)             { return *x;                                                }
-force_inline cb_function I32   atomic_read_i32       (volatile I32 *x)             { return *x;                                                }
-force_inline cb_function U32   atomic_write_u32      (volatile U32 *x, U32 value)  { InterlockedExchange((I32 *)x, (I32)value);                }
-force_inline cb_function I32   atomic_write_i32      (volatile I32 *x, I32 value)  { InterlockedExchange(x, value);                            }
-force_inline cb_function U32   atomic_increment_u32  (volatile U32 *x)             { return InterlockedIncrement((I32 *)x);                    }
-force_inline cb_function I32   atomic_increment_i32  (volatile I32 *x)             { return InterlockedIncrement(x);                           }
-force_inline cb_function U32   atomic_decrement_u32  (volatile U32 *x)             { return InterlockedDecrement((I32 *)x);                    }
-force_inline cb_function I32   atomic_decrement_i32  (volatile I32 *x)             { return InterlockedDecrement(x);                           }
+force_inline fn_internal U32   atomic_read_u32       (volatile U32 *x)             { return *x;                                                }
+force_inline fn_internal I32   atomic_read_i32       (volatile I32 *x)             { return *x;                                                }
+force_inline fn_internal U32   atomic_write_u32      (volatile U32 *x, U32 value)  { InterlockedExchange((I32 *)x, (I32)value);                }
+force_inline fn_internal I32   atomic_write_i32      (volatile I32 *x, I32 value)  { InterlockedExchange(x, value);                            }
+force_inline fn_internal U32   atomic_increment_u32  (volatile U32 *x)             { return InterlockedIncrement((I32 *)x);                    }
+force_inline fn_internal I32   atomic_increment_i32  (volatile I32 *x)             { return InterlockedIncrement(x);                           }
+force_inline fn_internal U32   atomic_decrement_u32  (volatile U32 *x)             { return InterlockedDecrement((I32 *)x);                    }
+force_inline fn_internal I32   atomic_decrement_i32  (volatile I32 *x)             { return InterlockedDecrement(x);                           }
 #endif
 
 #if ARCH_X86
@@ -380,14 +388,14 @@ typedef struct Mutex {
   volatile U32 serving;
 } Mutex;
 
-inline cb_function void mutex_start(Mutex *mutex) {
+inline fn_internal void mutex_start(Mutex *mutex) {
   U32 ticket = atomic_increment_u32(&mutex->next) - 1;
   while (atomic_read_u32(&mutex->serving) != ticket) {
     spinlock_pause;
   }
 }
 
-inline cb_function void mutex_end(Mutex *ticket) {
+inline fn_internal void mutex_end(Mutex *ticket) {
   atomic_increment_u32(&ticket->serving);
 }
 
@@ -451,94 +459,94 @@ inline cb_function void mutex_end(Mutex *ticket) {
 #define u64_billions(x)   (u64_millions(x)  * 1000LL)
 #define u64_trillions(x)  (u64_billions(x)  * 1000LL)
 
-force_inline cb_function U08 u08_min     (U08 lhs, U08 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function U08 u08_max     (U08 lhs, U08 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function U08 u08_clamp   (U08 x, U08 a, U08 b)   { return u08_min(u08_max(x, a), b);     }
+force_inline fn_internal U08 u08_min     (U08 lhs, U08 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal U08 u08_max     (U08 lhs, U08 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal U08 u08_clamp   (U08 x, U08 a, U08 b)   { return u08_min(u08_max(x, a), b);     }
 
-force_inline cb_function U16 u16_min     (U16 lhs, U16 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function U16 u16_max     (U16 lhs, U16 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function U16 u16_clamp   (U16 x, U16 a, U16 b)   { return u16_min(u16_max(x, a), b);     }
+force_inline fn_internal U16 u16_min     (U16 lhs, U16 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal U16 u16_max     (U16 lhs, U16 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal U16 u16_clamp   (U16 x, U16 a, U16 b)   { return u16_min(u16_max(x, a), b);     }
 
-force_inline cb_function U32 u32_min     (U32 lhs, U32 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function U32 u32_max     (U32 lhs, U32 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function U32 u32_clamp   (U32 x, U32 a, U32 b)   { return u32_min(u32_max(x, a), b);     }
+force_inline fn_internal U32 u32_min     (U32 lhs, U32 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal U32 u32_max     (U32 lhs, U32 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal U32 u32_clamp   (U32 x, U32 a, U32 b)   { return u32_min(u32_max(x, a), b);     }
 
-force_inline cb_function U64 u64_min     (U64 lhs, U64 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function U64 u64_max     (U64 lhs, U64 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function U64 u64_clamp   (U64 x, U64 a, U64 b)   { return u64_min(u64_max(x, a), b);     }
+force_inline fn_internal U64 u64_min     (U64 lhs, U64 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal U64 u64_max     (U64 lhs, U64 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal U64 u64_clamp   (U64 x, U64 a, U64 b)   { return u64_min(u64_max(x, a), b);     }
 
-force_inline cb_function I08 i08_min     (I08 lhs, I08 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function I08 i08_max     (I08 lhs, I08 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function I08 i08_clamp   (I08 x, I08 a, I08 b)   { return i08_min(i08_max(x, a), b);     }
-force_inline cb_function I08 i08_sign    (I08 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
-force_inline cb_function I08 i08_abs     (I08 x)                 { return x < 0 ? -x : x;                }
+force_inline fn_internal I08 i08_min     (I08 lhs, I08 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal I08 i08_max     (I08 lhs, I08 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal I08 i08_clamp   (I08 x, I08 a, I08 b)   { return i08_min(i08_max(x, a), b);     }
+force_inline fn_internal I08 i08_sign    (I08 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
+force_inline fn_internal I08 i08_abs     (I08 x)                 { return x < 0 ? -x : x;                }
 
-force_inline cb_function I16 i16_min     (I16 lhs, I16 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function I16 i16_max     (I16 lhs, I16 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function I16 i16_clamp   (I16 x, I16 a, I16 b)   { return i16_min(i16_max(x, a), b);     }
-force_inline cb_function I16 i16_sign    (I16 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
-force_inline cb_function I16 i16_abs     (I16 x)                 { return x < 0 ? -x : x;                }
+force_inline fn_internal I16 i16_min     (I16 lhs, I16 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal I16 i16_max     (I16 lhs, I16 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal I16 i16_clamp   (I16 x, I16 a, I16 b)   { return i16_min(i16_max(x, a), b);     }
+force_inline fn_internal I16 i16_sign    (I16 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
+force_inline fn_internal I16 i16_abs     (I16 x)                 { return x < 0 ? -x : x;                }
 
-force_inline cb_function I32 i32_min     (I32 lhs, I32 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function I32 i32_max     (I32 lhs, I32 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function I32 i32_clamp   (I32 x, I32 a, I32 b)   { return i32_min(i32_max(x, a), b);     }
-force_inline cb_function I32 i32_sign    (I32 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
-force_inline cb_function I32 i32_abs     (I32 x)                 { return x < 0 ? -x : x;                }
+force_inline fn_internal I32 i32_min     (I32 lhs, I32 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal I32 i32_max     (I32 lhs, I32 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal I32 i32_clamp   (I32 x, I32 a, I32 b)   { return i32_min(i32_max(x, a), b);     }
+force_inline fn_internal I32 i32_sign    (I32 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
+force_inline fn_internal I32 i32_abs     (I32 x)                 { return x < 0 ? -x : x;                }
 
-force_inline cb_function I64 i64_min     (I64 lhs, I64 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function I64 i64_max     (I64 lhs, I64 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function I64 i64_clamp   (I64 x, I64 a, I64 b)   { return i64_min(i64_max(x, a), b);     }
-force_inline cb_function I64 i64_sign    (I64 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
-force_inline cb_function I64 i64_abs     (I64 x)                 { return x < 0 ? -x : x;                }
+force_inline fn_internal I64 i64_min     (I64 lhs, I64 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal I64 i64_max     (I64 lhs, I64 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal I64 i64_clamp   (I64 x, I64 a, I64 b)   { return i64_min(i64_max(x, a), b);     }
+force_inline fn_internal I64 i64_sign    (I64 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
+force_inline fn_internal I64 i64_abs     (I64 x)                 { return x < 0 ? -x : x;                }
 
-force_inline cb_function F32 f32_min      (F32 lhs, F32 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function F32 f32_max      (F32 lhs, F32 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function F32 f32_clamp    (F32 x, F32 a, F32 b)   { return f32_min(f32_max(x, a), b);     }
-force_inline cb_function F32 f32_sign     (F32 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
-force_inline cb_function F32 f32_abs      (F32 x)                 { return x < 0 ? -x : x;                }
-force_inline cb_function F32 f32_div_safe (F32 a, F32 b)          { return b == 0 ? 0 : a / b;            }
+force_inline fn_internal F32 f32_min      (F32 lhs, F32 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal F32 f32_max      (F32 lhs, F32 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal F32 f32_clamp    (F32 x, F32 a, F32 b)   { return f32_min(f32_max(x, a), b);     }
+force_inline fn_internal F32 f32_sign     (F32 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
+force_inline fn_internal F32 f32_abs      (F32 x)                 { return x < 0 ? -x : x;                }
+force_inline fn_internal F32 f32_div_safe (F32 a, F32 b)          { return b == 0 ? 0 : a / b;            }
 
-force_inline cb_function F64 f64_min      (F64 lhs, F64 rhs)      { return lhs < rhs ? lhs : rhs;         }
-force_inline cb_function F64 f64_max      (F64 lhs, F64 rhs)      { return lhs > rhs ? lhs : rhs;         }
-force_inline cb_function F64 f64_clamp    (F64 x, F64 a, F64 b)   { return f64_min(f64_max(x, a), b);     }
-force_inline cb_function F64 f64_sign     (F64 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
-force_inline cb_function F64 f64_abs      (F64 x)                 { return x < 0 ? -x : x;                }
-force_inline cb_function F64 f64_div_safe (F64 a, F64 b)          { return b == 0 ? 0 : a / b;            }
+force_inline fn_internal F64 f64_min      (F64 lhs, F64 rhs)      { return lhs < rhs ? lhs : rhs;         }
+force_inline fn_internal F64 f64_max      (F64 lhs, F64 rhs)      { return lhs > rhs ? lhs : rhs;         }
+force_inline fn_internal F64 f64_clamp    (F64 x, F64 a, F64 b)   { return f64_min(f64_max(x, a), b);     }
+force_inline fn_internal F64 f64_sign     (F64 x)                 { return x == 0 ? 0 : (x < 0 ? -1 : 1); }
+force_inline fn_internal F64 f64_abs      (F64 x)                 { return x < 0 ? -x : x;                }
+force_inline fn_internal F64 f64_div_safe (F64 a, F64 b)          { return b == 0 ? 0 : a / b;            }
 
 // ------------------------------------------------------------
 // #-- Character Operations
 
-inline cb_function B32 char_is_alpha      (I08 c) { return c >= 'A' && c <= 'z'; }
-inline cb_function B32 char_is_number     (I08 c) { return c >= '0' && c <= '9'; }
-inline cb_function B32 char_is_upper      (I08 c) { return c >= 'A' && c <= 'Z'; }
-inline cb_function B32 char_is_lower      (I08 c) { return c >= 'a' && c <= 'z'; }
-inline cb_function B32 char_is_whitespace (I08 c) { return c == ' ' || c == 't' || c == 'r' || c == 'n'; }
-inline cb_function B32 char_is_visible    (I08 c) { return c >= '!' && c <= '~'; }
-inline cb_function B32 char_is_linefeed   (I08 c) { return c == 'r' || c == 'n'; }
-inline cb_function I08 char_to_upper      (I08 c) { return !char_is_alpha(c) ? c : (c >  'Z' ? c - ('A' - 'a') : c); }
-inline cb_function I08 char_to_lower      (I08 c) { return !char_is_alpha(c) ? c : (c <= 'Z' ? c + ('A' - 'a') : c); }
+inline fn_internal B32 char_is_alpha      (I08 c) { return c >= 'A' && c <= 'z'; }
+inline fn_internal B32 char_is_number     (I08 c) { return c >= '0' && c <= '9'; }
+inline fn_internal B32 char_is_upper      (I08 c) { return c >= 'A' && c <= 'Z'; }
+inline fn_internal B32 char_is_lower      (I08 c) { return c >= 'a' && c <= 'z'; }
+inline fn_internal B32 char_is_whitespace (I08 c) { return c == ' ' || c == 't' || c == 'r' || c == 'n'; }
+inline fn_internal B32 char_is_visible    (I08 c) { return c >= '!' && c <= '~'; }
+inline fn_internal B32 char_is_linefeed   (I08 c) { return c == 'r' || c == 'n'; }
+inline fn_internal I08 char_to_upper      (I08 c) { return !char_is_alpha(c) ? c : (c >  'Z' ? c - ('A' - 'a') : c); }
+inline fn_internal I08 char_to_lower      (I08 c) { return !char_is_alpha(c) ? c : (c <= 'Z' ? c + ('A' - 'a') : c); }
 
 // ------------------------------------------------------------
 // #-- F32 Core Math
 
 #if COMPILER_CLANG || COMPILER_GCC
 
-force_inline cb_function F32 f32_floor  (F32 x) { return __builtin_floorf(x); }
-force_inline cb_function F32 f32_ceil   (F32 x) { return __builtin_ceilf(x);  }
-force_inline cb_function F32 f32_sqrt   (F32 x) { return __builtin_sqrtf(x);  }
-force_inline cb_function F32 f32_fabs   (F32 x) { return __builtin_fabsf(x);  }
-force_inline cb_function F32 f32_acos   (F32 x) { return __builtin_acosf(x);  }
-force_inline cb_function F32 f32_asin   (F32 x) { return __builtin_asinf(x);  }
-force_inline cb_function F32 f32_ln     (F32 x) { return __builtin_logf(x);   }
-force_inline cb_function F32 f32_exp    (F32 x) { return __builtin_expf(x);   }
-force_inline cb_function F32 f32_trunc  (F32 x) { return __builtin_truncf(x); }
+force_inline fn_internal F32 f32_floor  (F32 x) { return __builtin_floorf(x); }
+force_inline fn_internal F32 f32_ceil   (F32 x) { return __builtin_ceilf(x);  }
+force_inline fn_internal F32 f32_sqrt   (F32 x) { return __builtin_sqrtf(x);  }
+force_inline fn_internal F32 f32_fabs   (F32 x) { return __builtin_fabsf(x);  }
+force_inline fn_internal F32 f32_acos   (F32 x) { return __builtin_acosf(x);  }
+force_inline fn_internal F32 f32_asin   (F32 x) { return __builtin_asinf(x);  }
+force_inline fn_internal F32 f32_ln     (F32 x) { return __builtin_logf(x);   }
+force_inline fn_internal F32 f32_exp    (F32 x) { return __builtin_expf(x);   }
+force_inline fn_internal F32 f32_trunc  (F32 x) { return __builtin_truncf(x); }
 
 #else
 #error "F32 core math ops not implemented for this target"
 
 #endif
 
-force_inline cb_function F32 f32_pow(F32 x, F32 y) {
+force_inline fn_internal F32 f32_pow(F32 x, F32 y) {
   F32 result = 0;
 
   if (x >= 0) {
@@ -560,21 +568,21 @@ force_inline cb_function F32 f32_pow(F32 x, F32 y) {
   return result;
 }
 
-force_inline cb_function F32 f32_fmod(F32 x, F32 y) {
+force_inline fn_internal F32 f32_fmod(F32 x, F32 y) {
   F32 q  = x / y;
   F32 iq = f32_trunc(q);
   return x - iq * y;
 }
 
 
-force_inline cb_function F32 f32_pow2                 (F32 x) { return x * x;                 }
-force_inline cb_function F32 f32_fract                (F32 x) { return x - f32_floor(x);      }
-force_inline cb_function F32 f32_degrees_from_radians (F32 x) { return (x * 180.f)  / f32_pi; }
-force_inline cb_function F32 f32_radians_from_degrees (F32 x) { return (x * f32_pi) / 180.0f; }
+force_inline fn_internal F32 f32_pow2                 (F32 x) { return x * x;                 }
+force_inline fn_internal F32 f32_fract                (F32 x) { return x - f32_floor(x);      }
+force_inline fn_internal F32 f32_degrees_from_radians (F32 x) { return (x * 180.f)  / f32_pi; }
+force_inline fn_internal F32 f32_radians_from_degrees (F32 x) { return (x * f32_pi) / 180.0f; }
 
-cb_function F32 f32_sin (F32 x);
-force_inline cb_function F32 f32_cos  (F32 x) { return f32_sin(f32_hpi + x);   }
-force_inline cb_function F32 f32_tan  (F32 x) { return f32_sin(x) / f32_cos(x); }
+fn_internal F32 f32_sin (F32 x);
+force_inline fn_internal F32 f32_cos  (F32 x) { return f32_sin(f32_hpi + x);   }
+force_inline fn_internal F32 f32_tan  (F32 x) { return f32_sin(x) / f32_cos(x); }
 
 // ------------------------------------------------------------
 // #-- Local Time
@@ -589,7 +597,7 @@ typedef struct {
   U32 microseconds;
 } Local_Time;
 
-cb_function Local_Time local_time_from_unix_time(U64 unix_seconds, U64 unix_microseconds);
+fn_internal Local_Time local_time_from_unix_time(U64 unix_seconds, U64 unix_microseconds);
 
 // ------------------------------------------------------------
 // #-- Core Operating System Features
@@ -632,30 +640,30 @@ typedef struct Core_File_Async_State {
   U64 os_handle_1;
 } Core_File_Async_State;
 
-cb_function Core_Context *            core_context              (void);
-cb_function void                      core_stream_write         (Str buffer, Core_Stream stream);
-cb_function void                      core_panic                (Str reason);
-cb_function Local_Time                core_local_time           (void);
+fn_internal Core_Context *            core_context              (void);
+fn_internal void                      core_stream_write         (Str buffer, Core_Stream stream);
+fn_internal void                      core_panic                (Str reason);
+fn_internal Local_Time                core_local_time           (void);
 
-cb_function U08 *                     core_memory_reserve       (U64 bytes);
-cb_function void                      core_memory_unreserve     (void *virtual_base, U64 bytes);
-cb_function void                      core_memory_commit        (void *virtual_base, U64 bytes, Core_Commit_Flag mode);
-cb_function void                      core_memory_uncommit      (void *virtual_base, U64 bytes);
+fn_internal U08 *                     core_memory_reserve       (U64 bytes);
+fn_internal void                      core_memory_unreserve     (void *virtual_base, U64 bytes);
+fn_internal void                      core_memory_commit        (void *virtual_base, U64 bytes, Core_Commit_Flag mode);
+fn_internal void                      core_memory_uncommit      (void *virtual_base, U64 bytes);
 
-cb_function void                      core_entry_point          (I32 arg_count, char **arg_values);
+fn_internal void                      core_entry_point          (I32 arg_count, char **arg_values);
 
-cb_function B32                       core_directory_create     (Str folder_path);
-cb_function B32                       core_directory_delete     (Str folder_path);
+fn_internal B32                       core_directory_create     (Str folder_path);
+fn_internal B32                       core_directory_delete     (Str folder_path);
 
-cb_function Core_File                 core_file_open            (Str file_path, Core_File_Access_Flag flags);
-cb_function void                      core_file_close           (Core_File *file);
-cb_function U64                       core_file_size            (Core_File *file);
+fn_internal Core_File                 core_file_open            (Str file_path, Core_File_Access_Flag flags);
+fn_internal void                      core_file_close           (Core_File *file);
+fn_internal U64                       core_file_size            (Core_File *file);
 
-cb_function void                      core_file_read            (Core_File *file, U64 offset, U64 bytes, void *data);
-cb_function void                      core_file_write           (Core_File *file, U64 offset, U64 bytes, void *data);
+fn_internal void                      core_file_read            (Core_File *file, U64 offset, U64 bytes, void *data);
+fn_internal void                      core_file_write           (Core_File *file, U64 offset, U64 bytes, void *data);
 
-cb_function Core_File_Async_State     core_file_read_async      (Core_File *file, U64 offset, U64 bytes, void *data);
-cb_function Core_File_Async_State     core_file_write_async     (Core_File *file, U64 offset, U64 bytes, void *data);
+fn_internal Core_File_Async_State     core_file_read_async      (Core_File *file, U64 offset, U64 bytes, void *data);
+fn_internal Core_File_Async_State     core_file_write_async     (Core_File *file, U64 offset, U64 bytes, void *data);
 
 #define File_IO_Scope(file_, str_, mode_) Defer_Scope(*(file_) = core_file_open(str_, mode_), core_file_close(file_))
 
@@ -679,7 +687,7 @@ cb_function Core_File_Async_State     core_file_write_async     (Core_File *file
 // ------------------------------------------------------------
 // #-- Address, Pointer Operations
 
-inline cb_function U64 address_align(U64 address, U64 align) {
+inline fn_internal U64 address_align(U64 address, U64 align) {
   Assert(!(align & (align - 1)), "align is not a power of two");
 
   U64 remainder = address & (align - 1);
@@ -690,13 +698,13 @@ inline cb_function U64 address_align(U64 address, U64 align) {
   return address;
 }
 
-inline cb_function U08 *pointer_align(void *pointer, U64 align) {
+inline fn_internal U08 *pointer_align(void *pointer, U64 align) {
   U64 address = (U64)pointer;
   address = address_align(address, align);
   pointer = (U08 *)address;
   return pointer;
 }
 
-inline cb_function U08 *pointer_offset_bytes(void *pointer, I64 bytes) {
+inline fn_internal U08 *pointer_offset_bytes(void *pointer, I64 bytes) {
   return (((U08 *)pointer) + bytes);
 }

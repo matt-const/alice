@@ -41,7 +41,7 @@ typedef struct Metal_Pipeline {
   id<MTLRenderPipelineState> pipeline;
 } Metal_Pipeline;
 
-cb_global struct {
+var_global struct {
   B32 initialized;
 
   CAMetalLayer *layer;
@@ -67,7 +67,7 @@ cb_global struct {
 
 // NOTE(cmat): Buffers.
 // #--
-cb_function R_Buffer r_buffer_allocate(U64 capacity, R_Buffer_Mode mode) {
+fn_internal R_Buffer r_buffer_allocate(U64 capacity, R_Buffer_Mode mode) {
   Metal_Buffer *metal_buffer = &Metal_State.buffers[Metal_State.buffer_last_id++];
   metal_buffer->buffer = [Metal_State.device newBufferWithLength:capacity options:MTLResourceStorageModeShared];
   Assert(metal_buffer->buffer, "error while creating metal buffer");
@@ -76,7 +76,7 @@ cb_function R_Buffer r_buffer_allocate(U64 capacity, R_Buffer_Mode mode) {
   return buffer;
 }
 
-cb_function void r_buffer_download(R_Buffer *buffer, U64 offset, U64 bytes, void *data) {
+fn_internal void r_buffer_download(R_Buffer *buffer, U64 offset, U64 bytes, void *data) {
   Assert(buffer->id, "invalid buffer");
   Metal_Buffer *metal_buffer = &Metal_State.buffers[buffer->id - 1];
   id<MTLBuffer> upload_buffer = [Metal_State.device newBufferWithBytes:data
@@ -98,16 +98,16 @@ cb_function void r_buffer_download(R_Buffer *buffer, U64 offset, U64 bytes, void
 }
 
 // TODO(cmat): Implement this.
-cb_function void r_buffer_destroy(R_Buffer *buffer) {
+fn_internal void r_buffer_destroy(R_Buffer *buffer) {
 }
 
 // NOTE(cmat): Textures.
 // #--
-cb_function R_Texture r_texture_allocate(R_Texture_Config *config) {
+fn_internal R_Texture r_texture_allocate(R_Texture_Config *config) {
   Metal_Texture *texture = &Metal_State.textures[Metal_State.texture_last_id++];
   @autoreleasepool {
 
-    cb_local_persist MTLPixelFormat metal_format_lookup[] = {
+    var_local_persist MTLPixelFormat metal_format_lookup[] = {
       MTLPixelFormatRGBA8Unorm, // R_Texture_Format_RGBA_U08_Normalized,
       MTLPixelFormatRGBA8Snorm, // R_Texture_Format_RGBA_I08_Normalized,
       MTLPixelFormatR8Unorm,    // R_Texture_Format_R_U08_Normalized,
@@ -135,7 +135,7 @@ cb_function R_Texture r_texture_allocate(R_Texture_Config *config) {
 }
 
 
-cb_function void r_texture_download(R_Texture *texture, U08 *texture_data) {
+fn_internal void r_texture_download(R_Texture *texture, U08 *texture_data) {
   Metal_Texture *metal_texture = &Metal_State.textures[texture->id - 1];
 
   // TODO(cmat): Assuming 4 channels this is wrong.
@@ -165,12 +165,12 @@ cb_function void r_texture_download(R_Texture *texture, U08 *texture_data) {
 
 // NOTE(cmat): Pipelines.
 // #--
-cb_function R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format format) {
+fn_internal R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format format) {
   Metal_Pipeline *metal_pipeline = &Metal_State.pipelines[Metal_State.pipeline_last_id++];
   
   @autoreleasepool {
     MTLVertexDescriptor *vertex_desc = [[[MTLVertexDescriptor alloc] init] autorelease];
-    cb_local_persist MTLVertexFormat metal_format_lookup[] = {
+    var_local_persist MTLVertexFormat metal_format_lookup[] = {
         MTLVertexFormatFloat,  // R_Vertex_Attribute_F32
         MTLVertexFormatFloat2, // R_Vertex_Attribute_V2_F32,
         MTLVertexFormatFloat3, // R_Vertex_Attribute_V3_F32,
@@ -240,7 +240,7 @@ cb_function R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format format
 // NOTE(cmat): Default resources initialization.
 // #--
 
-cb_function void metal_create_default_shaders(void) {
+fn_internal void metal_create_default_shaders(void) {
   NSError *lib_error = 0;
   dispatch_data_t lib_data = dispatch_data_create(metal_baked_shaders_data, metal_baked_shaders_bytes, 0, 0);
   id<MTLLibrary> lib = [Metal_State.device newLibraryWithData:lib_data error:&lib_error];
@@ -271,7 +271,7 @@ cb_function void metal_create_default_shaders(void) {
   }
 }
 
-cb_function void metal_create_default_samplers(void) {
+fn_internal void metal_create_default_samplers(void) {
   Metal_Sampler *linear_clamp = &Metal_State.samplers[Metal_State.sampler_last_id++]; {
     MTLSamplerDescriptor *sampler_desc = [[[MTLSamplerDescriptor alloc] init] autorelease];
     sampler_desc.minFilter = MTLSamplerMinMagFilterLinear;
@@ -303,7 +303,7 @@ cb_function void metal_create_default_samplers(void) {
   }
 }
 
-cb_function void metal_create_default_textures(void) {
+fn_internal void metal_create_default_textures(void) {
   R_Texture_Config white_texture_conf = {
     .format = R_Texture_Format_RGBA_U08_Normalized,
     .width  = 2,
@@ -321,7 +321,7 @@ cb_function void metal_create_default_textures(void) {
 
 // NOTE(cmat): Begin frame, End frame.
 // #--
-cb_function void r_init(Platform_Render_Context *context) {
+fn_internal void r_init(Platform_Render_Context *context) {
   If_Unlikely(!Metal_State.initialized) {
     @autoreleasepool {
       Metal_State.initialized = 1;
@@ -347,7 +347,7 @@ cb_function void r_init(Platform_Render_Context *context) {
   }
 }
 
-cb_function void r_frame_flush(void) {
+fn_internal void r_frame_flush(void) {
   V2F display_size = platform_display()->resolution;
   
   @autoreleasepool {

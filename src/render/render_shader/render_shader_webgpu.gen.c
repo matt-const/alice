@@ -1,4 +1,4 @@
-cb_global char * ogl4_shader_vertex_flat_2D = 
+var_global char * ogl4_shader_vertex_flat_2D = 
   "struct _MatrixStorage_float4x4_ColMajorstd140_0\n"
   "{\n"
   "    @align(16) data_0 : array<vec4<f32>, i32(4)>,\n"
@@ -38,7 +38,7 @@ cb_global char * ogl4_shader_vertex_flat_2D =
   "}\n"
   "\n"
 ;
-cb_global char * ogl4_shader_pixel_flat_2D = 
+var_global char * ogl4_shader_pixel_flat_2D = 
   "@binding(0) @group(0) var Texture_Array_0 : array<texture_2d<f32>, i32(16)>;\n"
   "\n"
   "@binding(1) @group(0) var Sampler_0 : sampler;\n"
@@ -63,7 +63,7 @@ cb_global char * ogl4_shader_pixel_flat_2D =
   "}\n"
   "\n"
 ;
-cb_global char * ogl4_shader_vertex_flat_3D = 
+var_global char * ogl4_shader_vertex_flat_3D = 
   "struct _MatrixStorage_float4x4_ColMajorstd140_0\n"
   "{\n"
   "    @align(16) data_0 : array<vec4<f32>, i32(4)>,\n"
@@ -104,7 +104,7 @@ cb_global char * ogl4_shader_vertex_flat_3D =
   "}\n"
   "\n"
 ;
-cb_global char * ogl4_shader_pixel_flat_3D = 
+var_global char * ogl4_shader_pixel_flat_3D = 
   "@binding(0) @group(0) var Texture_Array_0 : array<texture_2d<f32>, i32(16)>;\n"
   "\n"
   "@binding(1) @group(0) var Sampler_0 : sampler;\n"
@@ -129,7 +129,7 @@ cb_global char * ogl4_shader_pixel_flat_3D =
   "}\n"
   "\n"
 ;
-cb_global char * ogl4_shader_vertex_mtsdf_2D = 
+var_global char * ogl4_shader_vertex_mtsdf_2D = 
   "struct _MatrixStorage_float4x4_ColMajorstd140_0\n"
   "{\n"
   "    @align(16) data_0 : array<vec4<f32>, i32(4)>,\n"
@@ -169,7 +169,7 @@ cb_global char * ogl4_shader_vertex_mtsdf_2D =
   "}\n"
   "\n"
 ;
-cb_global char * ogl4_shader_pixel_mtsdf_2D = 
+var_global char * ogl4_shader_pixel_mtsdf_2D = 
   "@binding(0) @group(0) var Texture_Array_0 : array<texture_2d<f32>, i32(16)>;\n"
   "\n"
   "@binding(1) @group(0) var Sampler_0 : sampler;\n"

@@ -1,13 +1,13 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-cb_global Core_Context linux_context = {};
+var_global Core_Context linux_context = {};
 
-cb_function Core_Context *core_context(void) {
+fn_internal Core_Context *core_context(void) {
   return &linux_context;
 }
 
-cb_function void core_stream_write(Str buffer, Core_Stream stream) {
+fn_internal void core_stream_write(Str buffer, Core_Stream stream) {
   I32 unix_handle = 0;
   
   switch(stream) {
@@ -19,21 +19,21 @@ cb_function void core_stream_write(Str buffer, Core_Stream stream) {
   write(unix_handle, buffer.txt, buffer.len);
 }
 
-cb_function void core_panic(Str reason) {
+fn_internal void core_panic(Str reason) {
   core_stream_write(str_lit("## PANIC -- Aborting Execution ##\n"), Core_Stream_Standard_Error);
   core_stream_write(reason, Core_Stream_Standard_Error);
   core_stream_write(str_lit("\n"), Core_Stream_Standard_Error);
   exit(1);
 }
 
-cb_function Local_Time core_local_time(void) {
+fn_internal Local_Time core_local_time(void) {
   struct timeval tv;
   gettimeofday(&tv, 0);
   Local_Time result = local_time_from_unix_time((U64)tv.tv_sec, (U64)tv.tv_usec);
   return result;
 }
 
-cb_function U08 *core_memory_reserve(U64 bytes) {
+fn_internal U08 *core_memory_reserve(U64 bytes) {
   void *address = mmap(0, bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (address == (void*)-1) {
     core_panic(str_lit("virtual memory reserve failed"));
@@ -42,13 +42,13 @@ cb_function U08 *core_memory_reserve(U64 bytes) {
   return (U08 *)address;
 }
 
-cb_function void core_memory_unreserve(void *virtual_base, U64 bytes) {
+fn_internal void core_memory_unreserve(void *virtual_base, U64 bytes) {
   if (munmap(virtual_base, bytes)) {
     core_panic(str_lit("virtual memory unreserve failed"));
   }
 }
 
-cb_function void core_memory_commit(void *virtual_base, U64 bytes, Core_Commit_Flag mode) {
+fn_internal void core_memory_commit(void *virtual_base, U64 bytes, Core_Commit_Flag mode) {
   unsigned long prot = 0;
   if (mode & Core_Commit_Flag_Read)       prot |= PROT_READ;
   if (mode & Core_Commit_Flag_Write)      prot |= PROT_WRITE;
@@ -59,13 +59,13 @@ cb_function void core_memory_commit(void *virtual_base, U64 bytes, Core_Commit_F
   }
 }
 
-cb_function void core_memory_uncommit(void *virtual_base, U64 bytes) {
+fn_internal void core_memory_uncommit(void *virtual_base, U64 bytes) {
   if (mprotect(virtual_base, bytes, PROT_NONE)) {
     core_panic(str_lit("virtual memory uncommit failed"));
   }
 }
 
-cb_function B32 core_directory_create(Str folder_path) {
+fn_internal B32 core_directory_create(Str folder_path) {
   // TODO(cmat): Handle this better.
   I08 buffer[4096 + 1];
   memory_copy(buffer, folder_path.txt, u64_min(folder_path.len, 4096));
@@ -75,7 +75,7 @@ cb_function B32 core_directory_create(Str folder_path) {
   return result;
 }
 
-cb_function B32 core_directory_delete(Str folder_path) {
+fn_internal B32 core_directory_delete(Str folder_path) {
   // TODO(cmat): Handle this better.
   I08 buffer[4096 + 1];
   memory_copy(buffer, folder_path.txt, u64_min(folder_path.len, 4096));
@@ -85,7 +85,7 @@ cb_function B32 core_directory_delete(Str folder_path) {
   return result;
 }
 
-cb_function Core_File core_file_open(Str file_path, Core_File_Access_Flag flags) {
+fn_internal Core_File core_file_open(Str file_path, Core_File_Access_Flag flags) {
   // TODO(cmat): Handle this better.
   I08 buffer[4096 + 1];
   memory_copy(buffer, file_path.txt, u64_min(file_path.len, 4096));
@@ -111,7 +111,7 @@ cb_function Core_File core_file_open(Str file_path, Core_File_Access_Flag flags)
   return result;
 }
 
-cb_function U64 core_file_size(Core_File *file) {
+fn_internal U64 core_file_size(Core_File *file) {
   U64 result = 0;
   I32 file_handle = (I32)file->os_handle_1;
 
@@ -123,17 +123,17 @@ cb_function U64 core_file_size(Core_File *file) {
   return result;
 }
 
-cb_function void core_file_write(Core_File *file, U64 offset, U64 bytes, void *data) {
+fn_internal void core_file_write(Core_File *file, U64 offset, U64 bytes, void *data) {
   I32 file_handle = (I32)file->os_handle_1;
   pwrite(file_handle, data, bytes, offset);
 }
 
-cb_function void core_file_read(Core_File *file, U64 offset, U64 bytes, void *data) {
+fn_internal void core_file_read(Core_File *file, U64 offset, U64 bytes, void *data) {
   I32 file_handle = (I32)file->os_handle_1;
   pread(file_handle, data, bytes, offset);
 }
 
-cb_function void core_file_close(Core_File *file) {
+fn_internal void core_file_close(Core_File *file) {
   I32 file_handle = (I32)(U64)file->os_handle_1;
   close(file_handle);
 
@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
     cpu_id_at += 16;
   }
 
-  linux_context.cpu_name = str(sarray_len(cpu_id), (I08 *)cpu_id);
+  linux_context.cpu_name = str(sarray_len(cpu_id), cpu_id);
   linux_context.cpu_name = str_trim(linux_context.cpu_name);
 
 #else

@@ -16,8 +16,8 @@ compile_shader "mtsdf_2D"
 xcrun -sdk macosx metallib -o baked_shaders.metallib *.ir
 
 xxd -i baked_shaders.metallib | sed \
-    -e "s/unsigned int baked_shaders_metallib_len/cb_global U64 metal_baked_shaders_bytes/g" \
-    -e "s/unsigned char baked_shaders_metallib/cb_global U08 metal_baked_shaders_data/g" \
+    -e "s/unsigned int baked_shaders_metallib_len/var_global U64 metal_baked_shaders_bytes/g" \
+    -e "s/unsigned char baked_shaders_metallib/var_global U08 metal_baked_shaders_data/g" \
     > "render_shader_metal.gen.c"
 
 rm *.metal

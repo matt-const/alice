@@ -1,9 +1,9 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-cb_global Platform_Frame_State linux_frame_state;
+var_global Platform_Frame_State linux_frame_state;
 
-cb_function Platform_Bootstrap linux_default_bootstrap(void) {
+fn_internal Platform_Bootstrap linux_default_bootstrap(void) {
   Platform_Bootstrap boot = {
     .title        = str_lit("Alice Engine"),
     .next_frame   = 0,
@@ -15,11 +15,11 @@ cb_function Platform_Bootstrap linux_default_bootstrap(void) {
   return boot;
 }
 
-cb_function Platform_Frame_State *platform_frame_state(void) {
+fn_internal Platform_Frame_State *platform_frame_state(void) {
   return &linux_frame_state;
 } 
 
-cb_function void base_entry_point(Array_Str command_line) {
+fn_internal void base_entry_point(Array_Str command_line) {
   Platform_Bootstrap boot = linux_default_bootstrap();
   platform_entry_point(command_line, &boot);
 

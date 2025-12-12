@@ -9,7 +9,7 @@
 
 #if 0
 
-cb_function GEO3_Path geo3_build_path(Arena *arena, GEO3_Path control_nodes, U64 oversample, U64 subdiv_level) {
+fn_internal GEO3_Path geo3_build_path(Arena *arena, GEO3_Path control_nodes, U64 oversample, U64 subdiv_level) {
 
   GEO3_Path result = {};
   Scratch scratch = { };
@@ -79,7 +79,7 @@ cb_function GEO3_Path geo3_build_path(Arena *arena, GEO3_Path control_nodes, U64
   return result;
 }
 
-cb_function GEO3_Surface geo3_build_tube (Arena *arena, GEO3_Path path, F32 radius, I32 resolution) {
+fn_internal GEO3_Surface geo3_build_tube (Arena *arena, GEO3_Path path, F32 radius, I32 resolution) {
   Assert(path.len > 1, "need at least 2 path nodes to construct a tube");
 
   U64 vertex_count  = resolution * path.len;

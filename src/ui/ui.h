@@ -5,7 +5,7 @@
 // https://www.rfleury.com/p/ui-part-2-build-it-every-frame-immediate?utm_source=publication-search
 
 typedef U64 UI_ID;
-cb_function UI_ID ui_id_from_str(Str string);
+fn_internal UI_ID ui_id_from_str(Str string);
 
 typedef U64 UI_Size_Type;
 enum {

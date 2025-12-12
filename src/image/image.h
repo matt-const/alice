@@ -15,5 +15,5 @@ enum {
   IM_File_Format_Count
 };
 
-cb_function inline IM_Bitmap  im_bitmap_allocate    (Arena *arena, U32 width, U32 height, U32 channels);
-cb_function inline void       im_bitmap_write_file  (IM_Bitmap *bitmap, Str filepath, IM_File_Format format);
+fn_internal inline IM_Bitmap  im_bitmap_allocate    (Arena *arena, U32 width, U32 height, U32 channels);
+fn_internal inline void       im_bitmap_write_file  (IM_Bitmap *bitmap, Str filepath, IM_File_Format format);

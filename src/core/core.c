@@ -3,7 +3,7 @@
 
 // ------------------------------------------------------------
 // #-- String Operations.
-cb_function U64 cstring_len(char *cstring) {
+fn_internal U64 cstring_len(char *cstring) {
   U64 len = 0;
   while(*cstring++) {
     len++;
@@ -12,21 +12,21 @@ cb_function U64 cstring_len(char *cstring) {
   return len;
 }
 
-cb_function Str str_slice(Str base, U64 start, U64 len) {
+fn_internal Str str_slice(Str base, U64 start, U64 len) {
   Assert(base.len >= start + len, "invalid string slice");
   return (Str) { .len = len, .txt = base.txt + start };
 }
 
-cb_function Str str_from_cstr(char *cstring) {
+fn_internal Str str_from_cstr(char *cstring) {
   Str result = {
     .len = cstring_len(cstring),
-    .txt = (I08 *)cstring
+    .txt = (U08 *)cstring
   };
 
   return result;
 }
 
-cb_function Str str_trim(Str string) {
+fn_internal Str str_trim(Str string) {
   U64 start = 0;
   For_U64(it, string.len) {
     if (char_is_whitespace(string.txt[it])) {
@@ -48,7 +48,7 @@ cb_function Str str_trim(Str string) {
   return str_slice(string, start, end - start);
 }
 
-cb_function B32 str_equals(Str lhs, Str rhs) {
+fn_internal B32 str_equals(Str lhs, Str rhs) {
   B32 result = lhs.len == rhs.len;
   if (result) {
     For_U64(it, lhs.len) {
@@ -62,7 +62,7 @@ cb_function B32 str_equals(Str lhs, Str rhs) {
   return result;
 }
 
-cb_function B32 str_equals_any_case(Str lhs, Str rhs) {
+fn_internal B32 str_equals_any_case(Str lhs, Str rhs) {
   B32 result = lhs.len == rhs.len;
   if (result) {
     For_U64(it, lhs.len) {
@@ -76,7 +76,7 @@ cb_function B32 str_equals_any_case(Str lhs, Str rhs) {
   return result;
 }
 
-cb_function B32 str_starts_with(Str base, Str start) {
+fn_internal B32 str_starts_with(Str base, Str start) {
   B32 result = base.len >= start.len;
   if (result) {
     result = str_equals(str_slice(base, 0, start.len), start);
@@ -85,7 +85,7 @@ cb_function B32 str_starts_with(Str base, Str start) {
   return result;
 }
 
-cb_function B32 str_starts_with_any_case(Str base, Str start) {
+fn_internal B32 str_starts_with_any_case(Str base, Str start) {
   B32 result = base.len >= start.len;
   if (result) {
     result = str_equals_any_case(str_slice(base, 0, start.len), start);
@@ -94,7 +94,7 @@ cb_function B32 str_starts_with_any_case(Str base, Str start) {
   return result;
 }
 
-cb_function B32 str_contains(Str base, Str sub) {
+fn_internal B32 str_contains(Str base, Str sub) {
   B32 result = 0;
   if (sub.len <= base.len) {
     For_U64(it, base.len - sub.len) {
@@ -106,7 +106,7 @@ cb_function B32 str_contains(Str base, Str sub) {
   return result;
 }
 
-cb_function B32 str_contains_any_case(Str base, Str sub) {
+fn_internal B32 str_contains_any_case(Str base, Str sub) {
   B32 result = 0;
   if (sub.len <= base.len) {
     For_U64(it, base.len - sub.len) {
@@ -119,7 +119,7 @@ cb_function B32 str_contains_any_case(Str base, Str sub) {
 }
 
 // NOTE(cmat): djb2, Dan Bernstein
-cb_function U64 str_hash(Str string) {
+fn_internal U64 str_hash(Str string) {
   U64 hash = 5381;
   For_U64(it, string.len) {
     hash = ((hash << 5) + hash) + string.txt[it];
@@ -128,25 +128,71 @@ cb_function U64 str_hash(Str string) {
   return hash;
 }
 
-cb_function I64 i64_from_str(Str value) {
+fn_internal I64 i64_from_str(Str value) {
   Not_Implemented;
   return 0;
 }
 
-cb_function F64 f64_from_str(Str value) {
+fn_internal F64 f64_from_str(Str value) {
   Not_Implemented;
   return 0;
 }
 
-cb_function B32 b32_from_str(Str value) {
+fn_internal B32 b32_from_str(Str value) {
   Not_Implemented;
   return 0;
 }
+
+fn_internal Codepoint codepoint_from_utf8(Str str_utf8, I32 *advance) {
+  Codepoint result = -1;
+  
+  if (str_utf8.len) {
+    U08 c0 = str_utf8.txt[0];
+
+    if (c0 < 0x80) {  // NOTE(cmat): 0xxxxxxx
+      result = c0;
+      *advance += 1;
+
+    } else if ((c0 & 0xE0) == 0xC0) { // NOTE(cmat): 110xxxxx 10xxxxxx
+      Assert(str_utf8.len >= 2, "utf8-decode missing 2 bytes");
+      if (str_utf8.len >= 2) {
+        result = c0 & 0x1F;
+        result = (c0 << 6) | (str_utf8.txt[1] & 0x3F);
+        *advance += 2;
+      }
+
+    } else if ((c0 & 0xF0) == 0xE0) { // NOTE(cmat): 1110xxxxx 10xxxxx 10xxxxxx
+      Assert(str_utf8.len >= 3, "utf8-decode missing 3 bytes");
+      if (str_utf8.len >= 3) {
+        result = c0 & 0x0F;
+        result = (c0 << 6) | (str_utf8.txt[1] & 0x3F);
+        result = (c0 << 6) | (str_utf8.txt[2] & 0x3F);
+        *advance += 3;
+      }
+
+    } else if ((c0 & 0xF8) == 0xF0) { // NOTE(cmat): 11110xxx 10xxxxx 10xxxxx 10xxxxxx
+      Assert(str_utf8.len >= 4, "utf8-decode missing 4 bytes");
+      if (str_utf8.len >= 4) {
+        result = c0 & 0x07;
+        result = (c0 << 6) | (str_utf8.txt[1] & 0x3F);
+        result = (c0 << 6) | (str_utf8.txt[2] & 0x3F);
+        result = (c0 << 6) | (str_utf8.txt[3] & 0x3F);
+        *advance += 4;
+      }
+
+    } else {
+      Assert(0, "utf8-decode invalid sequence");
+    }
+  }
+
+  return 0;
+}
+
 
 // ------------------------------------------------------------
 // #-- F32 Base Operations
 
-cb_function F32 f32_sin(F32 x) {
+fn_internal F32 f32_sin(F32 x) {
 
   // NOTE(cmat): wrap between [-pi, pi)
   x -= f32_2pi * f32_floor((x + f32_pi) / f32_2pi);
@@ -173,7 +219,7 @@ cb_function F32 f32_sin(F32 x) {
 
 // ------------------------------------------------------------
 // #-- Local Time
-cb_function Local_Time local_time_from_unix_time(U64 unix_seconds, U64 unix_microseconds) {
+fn_internal Local_Time local_time_from_unix_time(U64 unix_seconds, U64 unix_microseconds) {
 
   // NOTE(cmat): Derived math, it works.
   U64 until_today_seconds       = (unix_seconds % (3600LL * 24));

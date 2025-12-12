@@ -28,7 +28,7 @@ enum {
   G2_Draw_Mode_Count,
 };
 
-cb_global struct {
+var_global struct {
   Arena               arena;
   G2_Buffer           buffer;
   R_Buffer            vertex_buffer;
@@ -42,7 +42,7 @@ cb_global struct {
   R2I                 active_clip_region;
 } G2_State;
 
-cb_function void g2_init(void) {
+fn_internal void g2_init(void) {
   arena_init(&G2_State.arena);
   
   G2_State.buffer.vertex_capacity = G2_Vertex_Array_Capacity;
@@ -63,7 +63,7 @@ cb_function void g2_init(void) {
   G2_State.active_clip_region   = G2_State.last_clip_region;
 }
 
-cb_function void g2_submit_draw(void) {
+fn_internal void g2_submit_draw(void) {
   if (G2_State.buffer.draw_index_count) {
 
     // TODO(cmat): Move out some parts.
@@ -113,7 +113,7 @@ cb_function void g2_submit_draw(void) {
   }
 }
 
-cb_function void g2_frame_flush(void) {
+fn_internal void g2_frame_flush(void) {
   g2_submit_draw();
   if (G2_State.buffer.index_at && G2_State.buffer.vertex_at) {
     r_buffer_download(G2_State.vertex_buffer,  0, G2_State.buffer.vertex_at * sizeof(R_Vertex_XUC_2D),  (U08 *)G2_State.buffer.vertex_array);
@@ -136,7 +136,7 @@ typedef struct {
   U32              base_index;
 } G2_Draw_Entry;
 
-cb_function G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Texture texture, G2_Draw_Mode mode) {
+fn_internal G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Texture texture, G2_Draw_Mode mode) {
   Assert(G2_State.buffer.vertex_at  + vertex_count  < G2_State.buffer.vertex_capacity,  "2D immediate vertex buffer overflow");
   Assert(G2_State.buffer.index_at   + index_count   < G2_State.buffer.index_capacity,   "2D immediate index buffer overflow");
 
@@ -179,7 +179,7 @@ cb_function G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Text
   return entry;
 }
 
-cb_function void g2_draw_tri_ext(G2_Tri *tri) {
+fn_internal void g2_draw_tri_ext(G2_Tri *tri) {
   G2_Draw_Entry entry = g2_push_draw(3, 3, tri->tex, G2_Draw_Mode_Flat);
   entry.indices[0]  = entry.base_index;
   entry.indices[1]  = entry.base_index + 1;
@@ -191,7 +191,7 @@ cb_function void g2_draw_tri_ext(G2_Tri *tri) {
   entry.vertices[2] = (R_Vertex_XUC_2D) { .X = tri->x3, .C = packed_color, .U = tri->u3, };
 }
 
-cb_function void g2_draw_rect_ext(G2_Rect *rect) {
+fn_internal void g2_draw_rect_ext(G2_Rect *rect) {
   G2_Draw_Entry entry = g2_push_draw(4, 6, rect->tex, G2_Draw_Mode_Flat);
 
   entry.indices[0] = entry.base_index;
@@ -219,11 +219,11 @@ cb_function void g2_draw_rect_ext(G2_Rect *rect) {
   entry.vertices[3] = (R_Vertex_XUC_2D) { .X = X3, .C = packed_color, .U = U3, };
 }
 
-cb_function void g2_draw_rect_rounded_ext(G2_Rect_Rounded *rect) {
+fn_internal void g2_draw_rect_rounded_ext(G2_Rect_Rounded *rect) {
   Not_Implemented;
 }
 
-cb_function void g2_draw_disk_ext(G2_Disk *disk) {
+fn_internal void g2_draw_disk_ext(G2_Disk *disk) {
   U32 resolution = disk->resolution;
   G2_Draw_Entry entry = g2_push_draw(resolution + 1, 3 * resolution, R_Texture_White, G2_Draw_Mode_Flat);
 
@@ -247,7 +247,7 @@ cb_function void g2_draw_disk_ext(G2_Disk *disk) {
   }
 }
 
-cb_function void g2_draw_line_ext(G2_Line *line) {
+fn_internal void g2_draw_line_ext(G2_Line *line) {
   G2_Draw_Entry entry = g2_push_draw(4, 6, R_Texture_White, G2_Draw_Mode_Flat);
 
   entry.indices[0] = entry.base_index + 0;
@@ -272,7 +272,7 @@ cb_function void g2_draw_line_ext(G2_Line *line) {
 #if 0
 
 // TODO(cmat): This is all bad. Needs fixing.
-cb_function void g2_draw_text_ext(G2_Text *text) {
+fn_internal void g2_draw_text_ext(G2_Text *text) {
   U32 draw_glyph_count = 0;
   For_U32(it, text->text.len) {
     FO_Font_Glyph *g = &text->font->glyph_array[text->text.txt[it] - 32];
@@ -340,6 +340,6 @@ cb_function void g2_draw_text_ext(G2_Text *text) {
 #endif
 
 
-cb_function void g2_clip_region(R2I region) {
+fn_internal void g2_clip_region(R2I region) {
   G2_State.active_clip_region = region;
 }

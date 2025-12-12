@@ -4,11 +4,11 @@
 
 // ------------------------------------------------------------
 // #-- JS - WASM platform API.
-extern void js_platform_set_shared_memory(U32 frame_state);
+fn_external void js_platform_set_shared_memory(U32 frame_state);
 
 #pragma pack(push, 1)
 
-cb_global struct {
+var_global struct {
   U32 display_resolution_width;
   U32 display_resolution_height;
 
@@ -23,14 +23,14 @@ cb_global struct {
 #pragma pack(pop)
 
 
-cb_global struct {
+var_global struct {
   // TODO(cmat): Having doubts, I think first frame should be userland instead.
   B32                       first_frame;
   Platform_Next_Frame_Hook *next_frame;
   Platform_Frame_State      frame_state;
 } WASM_Platform_State;
 
-cb_function Platform_Bootstrap wasm_default_bootstrap(void) {
+fn_internal Platform_Bootstrap wasm_default_bootstrap(void) {
   Platform_Bootstrap result = {
     .title = str_lit("Alice Engine"),
     .next_frame = 0,
@@ -42,11 +42,11 @@ cb_function Platform_Bootstrap wasm_default_bootstrap(void) {
   return result;
 }
 
-cb_function Platform_Frame_State *platform_frame_state(void) {
+fn_internal Platform_Frame_State *platform_frame_state(void) {
   return &WASM_Platform_State.frame_state;
 }
 
-cb_function void wasm_update_input(Platform_Input *input) {
+fn_internal void wasm_update_input(Platform_Input *input) {
   V2F new_position          = v2f((F32)WASM_Shared_Frame_State.mouse_position_x, (F32)WASM_Shared_Frame_State.mouse_position_y);
   input->mouse.position_dt  = v2f_sub(new_position, input->mouse.position);
   input->mouse.position     = new_position;
@@ -60,7 +60,7 @@ cb_function void wasm_update_input(Platform_Input *input) {
   input->mouse.middle.down  = WASM_Shared_Frame_State.mouse_button_left;
 }
 
-cb_function void wasm_update_frame_state(Platform_Frame_State *state) {
+fn_internal void wasm_update_frame_state(Platform_Frame_State *state) {
   state->display.frame_index += 1;
   state->display.resolution   = v2f(WASM_Shared_Frame_State.display_resolution_width, WASM_Shared_Frame_State.display_resolution_height);
 
@@ -68,7 +68,7 @@ cb_function void wasm_update_frame_state(Platform_Frame_State *state) {
 }
 
 __attribute__((export_name("wasm_next_frame")))
-void wasm_next_frame(void) {
+fn_entry void wasm_next_frame(void) {
 
   Platform_Render_Context render_context = {
     .backend = Platform_Render_Backend_WebGPU
@@ -76,12 +76,12 @@ void wasm_next_frame(void) {
 
   wasm_update_frame_state(&WASM_Platform_State.frame_state);
 
-  cb_local_persist B32 first_frame = 1;
+  var_local_persist B32 first_frame = 1;
   WASM_Platform_State.next_frame(first_frame, &render_context);
   if (first_frame) first_frame = 0;
 }
 
-cb_function void base_entry_point(Array_Str command_line) {
+fn_internal void base_entry_point(Array_Str command_line) {
   Platform_Bootstrap boot = wasm_default_bootstrap();
   platform_entry_point(command_line, &boot);
   Assert(boot.next_frame, "next_frame not provided");

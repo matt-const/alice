@@ -4,7 +4,7 @@
 // ------------------------------------------------------------
 // #-- Arena
 
-cb_function U08 *arena_chunk_allocate(Arena_Chunk *chunk, U64 bytes, Arena_Push *alloc) {
+fn_internal U08 *arena_chunk_allocate(Arena_Chunk *chunk, U64 bytes, Arena_Push *alloc) {
   U08 *alloc_begin  = pointer_align(chunk->current, alloc->align);
   U08 *alloc_end    = alloc_begin + bytes;
 
@@ -35,7 +35,7 @@ cb_function U08 *arena_chunk_allocate(Arena_Chunk *chunk, U64 bytes, Arena_Push 
   return alloc_begin;
 }
 
-cb_function void arena_chunk_deallocate(Arena_Chunk *chunk) {
+fn_internal void arena_chunk_deallocate(Arena_Chunk *chunk) {
   Arena_Chunk chunk_header = {
     .header = {
       .magic        = arena_chunk_magic,
@@ -56,7 +56,7 @@ cb_function void arena_chunk_deallocate(Arena_Chunk *chunk) {
   memory_copy(new_header, &chunk_header, sizeof(Arena_Chunk)); 
 }
 
-cb_function Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) {
+fn_internal Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) {
   U64 page_bytes = core_context()->mmu_page_bytes;
   
   reserve_bytes = reserve_bytes + sizeof(Arena_Chunk);
@@ -88,7 +88,7 @@ cb_function Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) 
   return (Arena_Chunk *)header;
 }
 
-cb_function Arena_Chunk *arena_chunk_destroy(Arena_Chunk *chunk) {
+fn_internal Arena_Chunk *arena_chunk_destroy(Arena_Chunk *chunk) {
   Arena_Chunk *prev = chunk->prev;
   if (prev) {
     chunk->prev->next = 0;
@@ -104,7 +104,7 @@ cb_function Arena_Chunk *arena_chunk_destroy(Arena_Chunk *chunk) {
   return prev;
 }
 
-cb_function void arena_init_ext(Arena *arena, Arena_Init *config) {
+fn_internal void arena_init_ext(Arena *arena, Arena_Init *config) {
   Assert(!arena->first_chunk && !arena->last_chunk, "reinitializing arena");
   
   zero_fill(arena);
@@ -116,7 +116,7 @@ cb_function void arena_init_ext(Arena *arena, Arena_Init *config) {
   }
 }
 
-cb_function void arena_destroy(Arena *arena) {
+fn_internal void arena_destroy(Arena *arena) {
   Arena_Chunk *it = arena->last_chunk;
   while (it) it = arena_chunk_destroy(it);
   zero_fill(arena);  
@@ -159,7 +159,7 @@ cb_function void arena_destroy(Arena *arena) {
 // -         ^ insert new alloc here.
 // -      OLD CHUNK            NEW CHUNK
 
-cb_function U08 *arena_allocate_within_new_chunk(Arena *arena, U64 bytes, Arena_Push *config) {
+fn_internal U08 *arena_allocate_within_new_chunk(Arena *arena, U64 bytes, Arena_Push *config) {
     U64 default_chunk_bytes = arena_default_chunk_bytes;
     if (sizeof(Arena_Chunk) < default_chunk_bytes) {
       default_chunk_bytes -= sizeof(Arena_Chunk);
@@ -176,7 +176,7 @@ cb_function U08 *arena_allocate_within_new_chunk(Arena *arena, U64 bytes, Arena_
     return user_allocation;
 }
 
-cb_function U08 *arena_push_ext(Arena *arena, U64 bytes, Arena_Push *config) {
+fn_internal U08 *arena_push_ext(Arena *arena, U64 bytes, Arena_Push *config) {
   U64 default_chunk_bytes = arena_default_chunk_bytes;
   if (sizeof(Arena_Chunk) < default_chunk_bytes) {
     default_chunk_bytes -= sizeof(Arena_Chunk);
@@ -222,7 +222,7 @@ cb_function U08 *arena_push_ext(Arena *arena, U64 bytes, Arena_Push *config) {
   return user_allocation;
 }
 
-cb_function void arena_clear(Arena *arena) {
+fn_internal void arena_clear(Arena *arena) {
   // NOTE(cmat): We destroy all chunks, but only deallocate the first one.
   // - If you wish to destroy the first chunk as well, call arena_destroy
   // - (althought that does require calling arena_init again).
@@ -236,7 +236,7 @@ cb_function void arena_clear(Arena *arena) {
   }
 }
 
-cb_function Arena_Temp arena_temp_start(Arena *arena) {
+fn_internal Arena_Temp arena_temp_start(Arena *arena) {
   Arena_Temp result;
   if (!arena->last_chunk) {
     result = (Arena_Temp) { .arena = arena };
@@ -252,7 +252,7 @@ cb_function Arena_Temp arena_temp_start(Arena *arena) {
   return result;
 }
 
-cb_function void arena_temp_end(Arena_Temp *temporary) {
+fn_internal void arena_temp_end(Arena_Temp *temporary) {
   if (!temporary->rollback_chunk) {
     arena_clear(temporary->arena);
     zero_fill(temporary);
@@ -274,7 +274,7 @@ thread_local struct {
   Arena scratch_2;
 } Scratch_Thread;
 
-cb_function Arena *scratch_get_for_thread(Arena *conflict) {
+fn_internal Arena *scratch_get_for_thread(Arena *conflict) {
   Arena *scratch = &Scratch_Thread.scratch_1;
   If_Unlikely(conflict == &Scratch_Thread.scratch_1) {
     scratch = &Scratch_Thread.scratch_2;
@@ -283,7 +283,7 @@ cb_function Arena *scratch_get_for_thread(Arena *conflict) {
   return scratch;
 }
 
-cb_function void scratch_init_for_thread(void) {
+fn_internal void scratch_init_for_thread(void) {
   arena_init(&Scratch_Thread.scratch_1);
   arena_init(&Scratch_Thread.scratch_2);
 }
@@ -291,7 +291,7 @@ cb_function void scratch_init_for_thread(void) {
 // ------------------------------------------------------------
 // #-- Logging
 
-cb_global Logger_State Logger = {
+var_global Logger_State Logger = {
   .filter       = Logger_Filter_Build_Active,
   .zone_depth   = 0,
   .hook_count   = 0,
@@ -300,8 +300,8 @@ cb_global Logger_State Logger = {
   .mutex        = { },
 };
 
-cb_function void logger_entry(Logger_Entry *entry) {
-  thread_local cb_local_persist U08 entry_buffer[Logger_Max_Entry_Length] = {};
+fn_internal void logger_entry(Logger_Entry *entry) {
+  thread_local var_local_persist U08 entry_buffer[Logger_Max_Entry_Length] = {};
 
   Mutex_Scope(&Logger.mutex) {
 
@@ -326,13 +326,13 @@ cb_function void logger_entry(Logger_Entry *entry) {
   }
 }
 
-cb_function void logger_set_filter(Logger_Filter_Flag filter) { 
+fn_internal void logger_set_filter(Logger_Filter_Flag filter) { 
   Mutex_Scope(&Logger.mutex) {
     Logger.filter = filter;
   }
 }
 
-cb_function B32 logger_filter_type(Logger_Entry_Type type) {
+fn_internal B32 logger_filter_type(Logger_Entry_Type type) {
   B32 result = 0;
   Mutex_Scope(&Logger.mutex) {
     result = (Logger.filter & logger_filter_flag_from_entry_type(type));
@@ -341,7 +341,7 @@ cb_function B32 logger_filter_type(Logger_Entry_Type type) {
   return result;
 }
 
-cb_function void logger_push_hook(Logger_Write_Entry_Hook *write, Logger_Format_Entry_Hook *format) {
+fn_internal void logger_push_hook(Logger_Write_Entry_Hook *write, Logger_Format_Entry_Hook *format) {
   Mutex_Scope(&Logger.mutex) {
     Assert(Logger.hook_count < Logger_Max_Hooks, "exceeded hook count");
     Logger.write_hooks[Logger.hook_count] = write;
@@ -355,8 +355,8 @@ cb_function void logger_push_hook(Logger_Write_Entry_Hook *write, Logger_Format_
 // #--
 // 
 
-cb_function void logger_format_entry_minimal(Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth) {
-    cb_local_persist Str type_lookup[] = {
+fn_internal void logger_format_entry_minimal(Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth) {
+    var_local_persist Str type_lookup[] = {
      str_lit(""), // NOTE(cmat): Info.
      str_lit(" [Debug]: "),
      str_lit(" [Warning]: "),
@@ -394,8 +394,8 @@ cb_function void logger_format_entry_minimal(Logger_Entry *entry, U08 *entry_buf
    }
 }
 
-cb_function void logger_format_entry_detailed(Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth) {
-    cb_local_persist Str type_lookup[] = {
+fn_internal void logger_format_entry_detailed(Logger_Entry *entry, U08 *entry_buffer, U32 zone_depth) {
+    var_local_persist Str type_lookup[] = {
      str_lit(""), // NOTE(cmat): Info.
      str_lit(" [Debug]"),
      str_lit(" [Warning]"),
@@ -438,7 +438,7 @@ cb_function void logger_format_entry_detailed(Logger_Entry *entry, U08 *entry_bu
                      (I32)type_str.len, type_str.txt, entry->message);
    }
 }
-cb_function void logger_write_entry_standard_stream(Logger_Entry_Type type, Str buffer) {
+fn_internal void logger_write_entry_standard_stream(Logger_Entry_Type type, Str buffer) {
   switch (type) {
     case Logger_Entry_Error:
     case Logger_Entry_Fatal: {
@@ -455,7 +455,7 @@ cb_function void logger_write_entry_standard_stream(Logger_Entry_Type type, Str 
   }
 }
 
-cb_function void log_message_ext(Logger_Entry_Type type, Function_Metadata func_meta, char *format, ...) {
+fn_internal void log_message_ext(Logger_Entry_Type type, Function_Metadata func_meta, char *format, ...) {
   if (logger_filter_type(type)) {
     Logger_Entry entry = { 
       .type = type, 
@@ -475,7 +475,7 @@ cb_function void log_message_ext(Logger_Entry_Type type, Function_Metadata func_
 // ------------------------------------------------------------
 // #-- Color Spaces
 
-cb_function RGB rgb_from_hsv(HSV hsv) {
+fn_internal RGB rgb_from_hsv(HSV hsv) {
 
   // NOTE(cmat): Compute hue only (assume saturation = 1, value = 1)
   F32 h_prime = 6.f * hsv.h;
@@ -488,25 +488,25 @@ cb_function RGB rgb_from_hsv(HSV hsv) {
   return hsv_rgb; 
 }
 
-cb_function HSV hsv_from_rgb(RGB rgb) {
+fn_internal HSV hsv_from_rgb(RGB rgb) {
   Not_Implemented;
   return v3f(0, 0, 0);
 }
 
-cb_function RGBA rgba_from_hsva(HSVA hsva) {
+fn_internal RGBA rgba_from_hsva(HSVA hsva) {
   return (RGBA) { .rgb = rgb_from_hsv(hsva.hsv), .a = hsva.a };
 }
 
-cb_function HSVA hsva_from_rgba(RGBA rgba) {
+fn_internal HSVA hsva_from_rgba(RGBA rgba) {
   return (HSVA) { .hsv = hsv_from_rgb(rgba.rgb), .a = rgba.a };
 }
 
-cb_function RGBA_U32 rgba_u32_from_rgba(RGBA rgba) {
+fn_internal RGBA_U32 rgba_u32_from_rgba(RGBA rgba) {
   U32 packed = ((U32)(U08)rgba.r << 24) | ((U32)(U08)rgba.g << 16) | ((U32)(U08)rgba.b <<  8) | ((U32)(U08)rgba.a);
   return packed;
 }
 
-cb_function RGBA_U32 abgr_u32_from_rgba(RGBA rgba) {
+fn_internal RGBA_U32 abgr_u32_from_rgba(RGBA rgba) {
   U32 packed = ((U32)(U08)(rgba.a * 255.f) << 24) | ((U32)(U08)(rgba.b * 255.f) << 16) | ((U32)(U08)(rgba.g * 255.f) <<  8) | ((U32)(U08)(rgba.r * 255.f));
   return packed;
 }
@@ -514,7 +514,7 @@ cb_function RGBA_U32 abgr_u32_from_rgba(RGBA rgba) {
 // ------------------------------------------------------------
 // #-- Splines
 
-cb_function V2F v2f_spline_catmull(F32 t, V2F p1, V2F p2, V2F p3, V2F p4) {
+fn_internal V2F v2f_spline_catmull(F32 t, V2F p1, V2F p2, V2F p3, V2F p4) {
   F32 t2 = t * t;
   F32 t3 = t2 * t;
 
@@ -531,7 +531,7 @@ cb_function V2F v2f_spline_catmull(F32 t, V2F p1, V2F p2, V2F p3, V2F p4) {
   return result;
 }
 
-cb_function V3F v3f_spline_catmull(F32 t, V3F p1, V3F p2, V3F p3, V3F p4) {
+fn_internal V3F v3f_spline_catmull(F32 t, V3F p1, V3F p2, V3F p3, V3F p4) {
   F32 t2 = t * t;
   F32 t3 = t2 * t;
 
@@ -548,7 +548,7 @@ cb_function V3F v3f_spline_catmull(F32 t, V3F p1, V3F p2, V3F p3, V3F p4) {
   return result;
 }
 
-cb_function V4F v4f_spline_catmull(F32 t, V4F p1, V4F p2, V4F p3, V4F p4) {
+fn_internal V4F v4f_spline_catmull(F32 t, V4F p1, V4F p2, V4F p3, V4F p4) {
   F32 t2 = t * t;
   F32 t3 = t2 * t;
 
@@ -565,7 +565,7 @@ cb_function V4F v4f_spline_catmull(F32 t, V4F p1, V4F p2, V4F p3, V4F p4) {
   return result;
 }
 
-cb_function V2F v2f_spline_catmull_dt(F32 t, V2F p1, V2F p2, V2F p3, V2F p4) {
+fn_internal V2F v2f_spline_catmull_dt(F32 t, V2F p1, V2F p2, V2F p3, V2F p4) {
   F32 t2 = t * t;
 
   F32 dt_a = -1.5f * t2 + 2.0f * t - 0.5f;
@@ -581,7 +581,7 @@ cb_function V2F v2f_spline_catmull_dt(F32 t, V2F p1, V2F p2, V2F p3, V2F p4) {
   return result;
 }
 
-cb_function V3F v3f_spline_catmull_dt(F32 t, V3F p1, V3F p2, V3F p3, V3F p4) {
+fn_internal V3F v3f_spline_catmull_dt(F32 t, V3F p1, V3F p2, V3F p3, V3F p4) {
   F32 t2 = t * t;
 
   F32 dt_a = -1.5f * t2 + 2.0f * t - 0.5f;
@@ -597,7 +597,7 @@ cb_function V3F v3f_spline_catmull_dt(F32 t, V3F p1, V3F p2, V3F p3, V3F p4) {
   return result;
 }
 
-cb_function V4F v4f_spline_catmull_dt(F32 t, V4F p1, V4F p2, V4F p3, V4F p4) {
+fn_internal V4F v4f_spline_catmull_dt(F32 t, V4F p1, V4F p2, V4F p3, V4F p4) {
   F32 t2 = t * t;
 
   F32 dt_a = -1.5f * t2 + 2.0f * t - 0.5f;
@@ -616,14 +616,14 @@ cb_function V4F v4f_spline_catmull_dt(F32 t, V4F p1, V4F p2, V4F p3, V4F p4) {
 // ------------------------------------------------------------
 // #-- Matrix ops
 
-cb_function F32 m2f_det(M2F x) {
+fn_internal F32 m2f_det(M2F x) {
   F32 result = (x.e11 * x.e22) -
                (x.e12 * x.e21);
 
   return result;
 }
 
-cb_function F32 m3f_det(M3F x) {
+fn_internal F32 m3f_det(M3F x) {
   F32 result = (x.e11 * x.e22 * x.e33 +
                 x.e12 * x.e23 * x.e31 +
                 x.e13 * x.e21 * x.e32) -
@@ -635,7 +635,7 @@ cb_function F32 m3f_det(M3F x) {
   return result;
 }
 
-cb_function F32 m4f_det(M4F x) {
+fn_internal F32 m4f_det(M4F x) {
   F32 result = 
     x.ele[0][3] * x.ele[1][2] * x.ele[2][1] * x.ele[3][0] - x.ele[0][2] * x.ele[1][3] * x.ele[2][1] * x.ele[3][0] -
     x.ele[0][3] * x.ele[1][1] * x.ele[2][2] * x.ele[3][0] + x.ele[0][1] * x.ele[1][3] * x.ele[2][2] * x.ele[3][0] +
@@ -653,7 +653,7 @@ cb_function F32 m4f_det(M4F x) {
   return result;
 }
 
-cb_function B32 m4f_inv(M4F x, M4F *solved) {
+fn_internal B32 m4f_inv(M4F x, M4F *solved) {
   M4F inverse;
   zero_fill(&inverse);
 
@@ -786,7 +786,7 @@ cb_function B32 m4f_inv(M4F x, M4F *solved) {
 // ------------------------------------------------------------
 // #-- Entry Point
 
-cb_function void core_entry_point(I32 argument_count, char **argument_values) {
+fn_internal void core_entry_point(I32 argument_count, char **argument_values) {
   
   // TODO(cmat): Just have a thread_local thread context initialization instead.
   scratch_init_for_thread();

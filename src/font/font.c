@@ -3,22 +3,22 @@
 
 // ------------------------------------------------------------
 // #-- NOTE(cmat): Link core layer functionality to stb backend
-cb_global Arena STBTT_Arena = { };
+var_global Arena STBTT_Arena = { };
 
-cb_global void STBTT_backend_init() {
+var_global void STBTT_backend_init() {
   arena_init(&STBTT_Arena);
 }
 
-cb_global void STBTT_backend_free() {
+var_global void STBTT_backend_free() {
   arena_destroy(&STBTT_Arena);
 }
 
-cb_function void *STBTT_malloc_ext(U64 bytes) {
+fn_internal void *STBTT_malloc_ext(U64 bytes) {
   void *data = arena_push_size(&STBTT_Arena, bytes, .flags = 0);
   return data;
 }
 
-cb_function void STBTT_free_ext(void *ptr) {
+fn_internal void STBTT_free_ext(void *ptr) {
   // NOTE(cmat): We free memory at STBTT_backend_free all at once.
 }
 

@@ -15,11 +15,11 @@ typedef R_Resource R_Pipeline;
 
 // NOTE(cmat): Invalid resource handles.
 
-extern R_Shader    R_Shader_Invalid;
-extern R_Buffer    R_Buffer_Invalid;
-extern R_Texture   R_Texture_Invalid;
-extern R_Sampler   R_Sampler_Invalid;
-extern R_Pipeline  R_Pipeline_Invalid;
+var_external R_Shader    R_Shader_Invalid;
+var_external R_Buffer    R_Buffer_Invalid;
+var_external R_Texture   R_Texture_Invalid;
+var_external R_Sampler   R_Sampler_Invalid;
+var_external R_Pipeline  R_Pipeline_Invalid;
 
 typedef U32 R_Buffer_Mode;
 enum {
@@ -32,10 +32,10 @@ typedef struct R_Buffer_Info {
   R_Buffer_Mode  mode;
 } R_Buffer_Info;
 
-cb_function R_Buffer        r_buffer_allocate (U64 capacity, R_Buffer_Mode mode);
-cb_function void            r_buffer_download (R_Buffer buffer, U64 offset, U64 bytes, void *data);
-cb_function R_Buffer_Info   r_buffer_info     (R_Buffer buffer);
-cb_function void            r_buffer_destroy  (R_Buffer *buffer);
+fn_internal R_Buffer        r_buffer_allocate (U64 capacity, R_Buffer_Mode mode);
+fn_internal void            r_buffer_download (R_Buffer buffer, U64 offset, U64 bytes, void *data);
+fn_internal R_Buffer_Info   r_buffer_info     (R_Buffer buffer);
+fn_internal void            r_buffer_destroy  (R_Buffer *buffer);
 
 typedef U32 R_Texture_Format;
 enum {
@@ -51,9 +51,9 @@ typedef struct {
   U32              height;
 } R_Texture_Config;
 
-cb_function R_Texture r_texture_allocate (R_Texture_Format format, U32 width, U32 height);
-cb_function void      r_texture_download (R_Texture texture, R_Texture_Format download_format, R2I region, void *data);
-cb_function void      r_texture_destroy  (R_Texture *texture);
+fn_internal R_Texture r_texture_allocate (R_Texture_Format format, U32 width, U32 height);
+fn_internal void      r_texture_download (R_Texture texture, R_Texture_Format download_format, R2I region, void *data);
+fn_internal void      r_texture_destroy  (R_Texture *texture);
 
 typedef U32 R_Sampler_Filter;
 enum {
@@ -61,8 +61,8 @@ enum {
   R_Sampler_Filter_Nearest,
 };
 
-cb_function R_Sampler r_sampler_create   (R_Sampler_Filter mag_filter, R_Sampler_Filter min_filter);
-cb_function void      r_sampler_destroy  (R_Sampler *sampler);
+fn_internal R_Sampler r_sampler_create   (R_Sampler_Filter mag_filter, R_Sampler_Filter min_filter);
+fn_internal void      r_sampler_destroy  (R_Sampler *sampler);
 
 #define R_Vertex_Max_Attribute_Count 8
 #define R_Declare_Vertex_Attribute(type_, x_) alignas(16) type_ x_
@@ -102,8 +102,8 @@ typedef struct {
 
 #pragma pack(pop)
 
-cb_function R_Pipeline r_pipeline_create  (R_Shader shader, R_Vertex_Format *format);
-cb_function void       r_pipeline_destroy (R_Pipeline *pipeline);
+fn_internal R_Pipeline r_pipeline_create  (R_Shader shader, R_Vertex_Format *format);
+fn_internal void       r_pipeline_destroy (R_Pipeline *pipeline);
 
 typedef struct {
   R_Declare_Vertex_Attribute(V2F, X);
@@ -111,7 +111,7 @@ typedef struct {
   R_Declare_Vertex_Attribute(U32, C);
 } R_Vertex_XUC_2D;
 
-cb_global R_Vertex_Format R_Vertex_Format_XUC_2D = {
+var_global R_Vertex_Format R_Vertex_Format_XUC_2D = {
   .stride       = sizeof(R_Vertex_XUC_2D),
   .entry_count  = 3,
   .entry_array  = {
@@ -127,7 +127,7 @@ typedef struct {
   R_Declare_Vertex_Attribute(U32, C);
 } R_Vertex_XUC_3D;
 
-cb_global R_Vertex_Format R_Vertex_Format_XUC_3D = {
+var_global R_Vertex_Format R_Vertex_Format_XUC_3D = {
   .stride       = sizeof(R_Vertex_XUC_3D),
   .entry_count  = 3,
   .entry_array  = {
@@ -157,7 +157,7 @@ typedef struct {
   R_Command_Header *last;
 } R_Command_Buffer;
 
-extern R_Command_Buffer R_Commands;
+var_external R_Command_Buffer R_Commands;
 
 #pragma pack(push, 1)
 
@@ -183,23 +183,23 @@ typedef struct R_Command_Draw {
 #pragma pack(pop)
 
 // TODO(cmat): shouldn't be exposed in userland.
-cb_function void r_command_reset      (void);
-cb_function void r_command_push_draw  (R_Command_Draw *draw);
+fn_internal void r_command_reset      (void);
+fn_internal void r_command_push_draw  (R_Command_Draw *draw);
 
-cb_function void r_init               (Platform_Render_Context *render_context);
-cb_function void r_frame_flush        (void);
+fn_internal void r_init               (Platform_Render_Context *render_context);
+fn_internal void r_frame_flush        (void);
 
 // ------------------------------------------------------------
 // #-- Default Resources
 
-extern R_Shader  R_Shader_Flat_2D;
-extern R_Shader  R_Shader_Flat_3D;
-extern R_Shader  R_Shader_MTSDF_2D;
+var_external R_Shader  R_Shader_Flat_2D;
+var_external R_Shader  R_Shader_Flat_3D;
+var_external R_Shader  R_Shader_MTSDF_2D;
 
-extern R_Texture R_Texture_White;
+var_external R_Texture R_Texture_White;
 
-extern R_Sampler R_Sampler_Linear_Clamp;
-extern R_Sampler R_Sampler_Nearest_Clamp;
+var_external R_Sampler R_Sampler_Linear_Clamp;
+var_external R_Sampler R_Sampler_Nearest_Clamp;
 
 typedef struct {
   alignas(16) M4F NDC_From_Screen;

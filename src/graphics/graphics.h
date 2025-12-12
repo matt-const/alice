@@ -5,9 +5,9 @@
 // #-- 2D Immediate Mode API
 #define G2_Clip_None r2i(0, 0, i32_limit_max, i32_limit_max)
 
-cb_function void g2_init        (void);
-cb_function void g2_frame_flush (void);
-cb_function void g2_clip_region (R2I region);
+fn_internal void g2_init        (void);
+fn_internal void g2_frame_flush (void);
+fn_internal void g2_clip_region (R2I region);
 
 typedef struct G2_Tri {
   V2F       x1, x2, x3;
@@ -18,7 +18,7 @@ typedef struct G2_Tri {
 
 // NOTE(cmat): Triangle
 
-cb_function void g2_draw_tri_ext(G2_Tri *tri);
+fn_internal void g2_draw_tri_ext(G2_Tri *tri);
 #define g2_draw_tri(x1_, x2_, x3_, ...)       \
   g2_draw_tri_ext(&(G2_Tri) {                 \
       .x1       = x1_,                        \
@@ -43,7 +43,7 @@ typedef struct G2_Rect {
   R_Texture tex;
 } G2_Rect;
 
-cb_function void g2_draw_rect_ext(G2_Rect *rect);
+fn_internal void g2_draw_rect_ext(G2_Rect *rect);
 #define g2_draw_rect(pos_, size_, ...)        \
   g2_draw_rect_ext(&(G2_Rect) {               \
       .pos            = pos_,                 \
@@ -65,7 +65,7 @@ typedef struct G2_Rect_Rounded {
   RGBA      color;
 } G2_Rect_Rounded;
 
-cb_function void g2_draw_rounded_rect_ext(G2_Rect_Rounded *rect);
+fn_internal void g2_draw_rounded_rect_ext(G2_Rect_Rounded *rect);
 #define g2_draw_rect_rounded(pos_, size_, radius_, ...)       \
   g2_draw_rect_rounded_ext(&(G2_Rect) {                       \
       .radius         = radius_,                              \
@@ -88,7 +88,7 @@ typedef struct G2_Disk {
   RGBA      color;
 } G2_Disk;
 
-cb_function void g2_draw_disk_ext(G2_Disk *disk);
+fn_internal void g2_draw_disk_ext(G2_Disk *disk);
 #define g2_draw_disk(pos_, radius_, ...)                      \
   g2_draw_disk_ext(&(G2_Disk) {                               \
       .pos            = pos_,                                 \
@@ -107,7 +107,7 @@ typedef struct G2_Line {
   RGBA      color;
 } G2_Line;
 
-cb_function void g2_draw_line_ext(G2_Line *line);
+fn_internal void g2_draw_line_ext(G2_Line *line);
 #define g2_draw_line(start_, end_, ...)                     \
   g2_draw_line_ext(&(G2_Line) {                             \
       .start = start_,                                      \
@@ -130,7 +130,7 @@ typedef struct G2_Text {
   F32      rot_deg;
 } G2_Text;
 
-cb_function void g2_draw_text_ext(G2_Text *text);
+fn_internal void g2_draw_text_ext(G2_Text *text);
 #define g2_draw_text(text_, font_, pos_, height_, ...)    \
   g2_draw_text_ext(&(G2_Text) {                           \
       .text    = text_,                                   \

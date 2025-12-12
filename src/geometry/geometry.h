@@ -16,19 +16,19 @@ typedef struct Skyline_Packer {
   Array_V2_U16 nodes;
 } Skyline_Packer;
 
-cb_function void skyline_packer_init(Skyline_Packer *sk, Arena *arena, V2_U16 atlas_size) {
+fn_internal void skyline_packer_init(Skyline_Packer *sk, Arena *arena, V2_U16 atlas_size) {
   sk->atlas_size = atlas_size;
 
   array_reserve(arena, &sk->nodes, atlas_size.x);
   array_push(&sk->nodes, v2_u16(0, 0));
 }
 
-cb_function void skyline_packer_reset(Skyline_Packer *sk) {
+fn_internal void skyline_packer_reset(Skyline_Packer *sk) {
   array_clear(&sk->nodes);
   array_push(&sk->nodes, v2_u16(0, 0));
 }
 
-cb_function B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border, V2_U16 *packed_position) {
+fn_internal B32 skyline_packer_push(Skyline_Packer *sk, V2_U16 rect, U16 border, V2_U16 *packed_position) {
   rect.x += border;
   rect.y += border;
 
@@ -120,6 +120,6 @@ typedef struct GEO3_Surface {
   Array_U32 indices;
 } GEO3_Surface;
 
-cb_function GEO3_Path     geo3_build_path(Arena *arena, GEO3_Path control_nodes, U64 oversample, U64 subdiv_level);
-cb_function GEO3_Surface  geo3_build_tube(Arena *arena, GEO3_Path path, F32 radius, I32 resolution);
+fn_internal GEO3_Path     geo3_build_path(Arena *arena, GEO3_Path control_nodes, U64 oversample, U64 subdiv_level);
+fn_internal GEO3_Surface  geo3_build_tube(Arena *arena, GEO3_Path path, F32 radius, I32 resolution);
 

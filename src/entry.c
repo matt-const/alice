@@ -29,7 +29,7 @@
 R_Texture Glyph_Texture;
 V2_U16 atlas_size = { 512, 512 };
 
-cb_function void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
+fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {
     r_init(render_context);
     g2_init();
@@ -88,7 +88,7 @@ cb_function void next_frame(B32 first_frame, Platform_Render_Context *render_con
   r_frame_flush();
 }
 
-cb_function void log_core_context(void) {
+fn_internal void log_core_context(void) {
   Log_Zone_Scope("hardware info") {
     log_info("CPU: %.*s",            str_expand(core_context()->cpu_name));
     log_info("Logical Cores: %llu",  core_context()->cpu_logical_cores);
@@ -97,7 +97,7 @@ cb_function void log_core_context(void) {
   }
 }
 
-cb_function void platform_entry_point(Array_Str command_line, Platform_Bootstrap *boot) {
+fn_internal void platform_entry_point(Array_Str command_line, Platform_Bootstrap *boot) {
   boot->next_frame = next_frame;
   boot->title = str_lit("Alice Engine");
 

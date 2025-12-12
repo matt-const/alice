@@ -1,7 +1,7 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-cb_function void test_base_allocation(void) {
+fn_internal void test_base_allocation(void) {
   Random_Seed rng = 0x0C0FEFE;
  
   Arena_Flag flag_combinations[2] = {
@@ -80,7 +80,7 @@ cb_function void test_base_allocation(void) {
   log_zone_end();
 }
 
-cb_function void test_base_all(void) {
+fn_internal void test_base_all(void) {
   Log_Zone_Scope("testing base subsystem") {
     test_base_allocation();
   }

@@ -15,8 +15,8 @@ typedef struct PBD_Springs {
   F32 *rest_lengths;
 } PBD_Springs;
 
-cb_function PBD_Mass_Points pbd_reserve_mass_points   (Arena *arena, U32 point_count);
-cb_function PBD_Springs     pbd_reserve_springs       (Arena *arena, U32 spring_count);
-cb_function void            pbd_step                  (PBD_Mass_Points *points, PBD_Springs *springs, F32 dt, U32 substeps);
+fn_internal PBD_Mass_Points pbd_reserve_mass_points   (Arena *arena, U32 point_count);
+fn_internal PBD_Springs     pbd_reserve_springs       (Arena *arena, U32 spring_count);
+fn_internal void            pbd_step                  (PBD_Mass_Points *points, PBD_Springs *springs, F32 dt, U32 substeps);
 
 

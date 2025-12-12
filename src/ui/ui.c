@@ -6,7 +6,7 @@ typedef struct UI_Node_Entry {
   UI_Node               node;
 } UI_Node_Entry;
 
-cb_global struct {
+var_global struct {
   Arena            node_arena;
   U32              node_hash_count;
   UI_Node_Entry  **node_hash;
@@ -16,7 +16,7 @@ cb_global struct {
   F32              font_height;
 } UI_State = { };
 
-cb_function void ui_init(void) {
+fn_internal void ui_init(void) {
   zero_fill(&UI_State);
   arena_init(&UI_State.node_arena);
 
@@ -29,7 +29,7 @@ cb_function void ui_init(void) {
   UI_State.next_id         = 0;
 }
 
-cb_function UI_Node *ui_node_cache(Str key) {
+fn_internal UI_Node *ui_node_cache(Str key) {
   UI_Node *result      = 0;
   U64 hash_slot        = str_hash(key) % UI_State.node_hash_count;
   UI_Node_Entry *entry = UI_State.node_hash[hash_slot];
@@ -58,16 +58,16 @@ cb_function UI_Node *ui_node_cache(Str key) {
   return result;
 }
 
-cb_function void ui_node_parent_push(UI_Node *parent)  {
+fn_internal void ui_node_parent_push(UI_Node *parent)  {
   UI_State.active_parent = parent;
 }
 
-cb_function void ui_node_parent_pop() {
+fn_internal void ui_node_parent_pop() {
   Assert(UI_State.active_parent, "can't pop further");
   UI_State.active_parent = UI_State.active_parent->parent;
 }
 
-cb_function UI_Node *ui_node_push(Str key, UI_Node_Flag flags) {
+fn_internal UI_Node *ui_node_push(Str key, UI_Node_Flag flags) {
   UI_Node *node     = ui_node_cache(key);
   node->label       = node->key;
 
@@ -123,7 +123,7 @@ cb_function UI_Node *ui_node_push(Str key, UI_Node_Flag flags) {
   return node;
 }
 
-cb_function void ui_layout_solve_fixed(UI_Node *node) {
+fn_internal void ui_layout_solve_fixed(UI_Node *node) {
   if (node) {
     For_U32 (it, 2) {
       switch (node->input_size[it].type) {
@@ -152,7 +152,7 @@ cb_function void ui_layout_solve_fixed(UI_Node *node) {
   }
 }
 
-cb_function void ui_layout_solve_upwards(UI_Node *node) {
+fn_internal void ui_layout_solve_upwards(UI_Node *node) {
   if (node) {
     For_U32 (it, 2) {
       switch (node->input_size[it].type) {
@@ -175,7 +175,7 @@ cb_function void ui_layout_solve_upwards(UI_Node *node) {
   }
 }
 
-cb_function void ui_layout_solve_downwards(UI_Node *node) {
+fn_internal void ui_layout_solve_downwards(UI_Node *node) {
   if (node) {
     ui_layout_solve_downwards(node->first_child);
     if (node->first == node) {
@@ -204,7 +204,7 @@ cb_function void ui_layout_solve_downwards(UI_Node *node) {
   }
 }
 
-cb_function V2F ui_layout_solve_position(UI_Node *node, V2F relative_position) {
+fn_internal V2F ui_layout_solve_position(UI_Node *node, V2F relative_position) {
   if (node) {
 
     if (node->flags & UI_Node_Flag_Layout_Float_X) {
@@ -239,16 +239,16 @@ cb_function V2F ui_layout_solve_position(UI_Node *node, V2F relative_position) {
   return relative_position;
 }
 
-cb_function void ui_layout_solve(UI_Node *root) {
+fn_internal void ui_layout_solve(UI_Node *root) {
   ui_layout_solve_fixed     (root);
   ui_layout_solve_upwards   (root);
   ui_layout_solve_downwards (root);
   ui_layout_solve_position  (root, v2f(0, 0));
 }
 
-cb_global Random_Seed ui_random = { };
+var_global Random_Seed ui_random = { };
 
-cb_function void ui_node_draw(UI_Node *node, V2F draw_at, F32 opacity, R2I clip_region) {
+fn_internal void ui_node_draw(UI_Node *node, V2F draw_at, F32 opacity, R2I clip_region) {
   if (node) {
     draw_at = v2f_add(draw_at, node->solved_relative_position);
     opacity = node->opacity_t * opacity;
@@ -301,7 +301,7 @@ cb_function void ui_node_draw(UI_Node *node, V2F draw_at, F32 opacity, R2I clip_
   }
 }
 
-cb_function void ui_animation_solve(UI_Node *node) {
+fn_internal void ui_animation_solve(UI_Node *node) {
  if (node) {
     ui_animation_solve(node->first_child);
     if (node->first == node) {
@@ -357,7 +357,7 @@ cb_function void ui_animation_solve(UI_Node *node) {
   }
 }
 
-cb_function void ui_frame_flush(UI_Node *root_node) {
+fn_internal void ui_frame_flush(UI_Node *root_node) {
   ui_animation_solve(root_node);
   ui_layout_solve(root_node);
 

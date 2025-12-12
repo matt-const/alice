@@ -3,28 +3,28 @@
 
 
 // NOTE(cmat): OGL4 prototypes to be loaded.
-cb_global PFNGLCREATEBUFFERSPROC      glCreateBuffers;
-cb_global PFNGLBINDBUFFERPROC         glBindBuffer;
-cb_global PFNGLBUFFERDATAPROC         glBufferData;
-cb_global PFNGLBUFFERSUBDATAPROC      glBufferSubData;
-cb_global PFNGLCREATETEXTURESPROC     glCreateTextures;
-cb_global PFNGLCREATESHADERPROC       glCreateShader;
-cb_global PFNGLSHADERSOURCEPROC       glShaderSource;
-cb_global PFNGLCOMPILESHADERPROC      glCompileShader;
-cb_global PFNGLATTACHSHADERPROC       glAttachShader;
-cb_global PFNGLCREATEPROGRAMPROC      glCreateProgram;
-cb_global PFNGLLINKPROGRAMPROC        glLinkProgram;
-cb_global PFNGLDETACHSHADERPROC       glDetachShader;
-cb_global PFNGLDELETESHADERPROC       glDeleteShader;
+var_global PFNGLCREATEBUFFERSPROC      glCreateBuffers;
+var_global PFNGLBINDBUFFERPROC         glBindBuffer;
+var_global PFNGLBUFFERDATAPROC         glBufferData;
+var_global PFNGLBUFFERSUBDATAPROC      glBufferSubData;
+var_global PFNGLCREATETEXTURESPROC     glCreateTextures;
+var_global PFNGLCREATESHADERPROC       glCreateShader;
+var_global PFNGLSHADERSOURCEPROC       glShaderSource;
+var_global PFNGLCOMPILESHADERPROC      glCompileShader;
+var_global PFNGLATTACHSHADERPROC       glAttachShader;
+var_global PFNGLCREATEPROGRAMPROC      glCreateProgram;
+var_global PFNGLLINKPROGRAMPROC        glLinkProgram;
+var_global PFNGLDETACHSHADERPROC       glDetachShader;
+var_global PFNGLDELETESHADERPROC       glDeleteShader;
 
-cb_global PFNGLGETSHADERIVPROC        glGetShaderiv;
-cb_global PFNGLGETSHADERINFOLOGPROC   glGetShaderInfoLog;
-cb_global PFNGLGETPROGRAMIVPROC       glGetProgramiv;
-cb_global PFNGLGETPROGRAMINFOLOGPROC  glGetProgramInfoLog;
+var_global PFNGLGETSHADERIVPROC        glGetShaderiv;
+var_global PFNGLGETSHADERINFOLOGPROC   glGetShaderInfoLog;
+var_global PFNGLGETPROGRAMIVPROC       glGetProgramiv;
+var_global PFNGLGETPROGRAMINFOLOGPROC  glGetProgramInfoLog;
 
 #define OGL4_Load_Proc(proc_) proc_ = ogl4_load_proc(Macro_Stringize(proc_))
 
-cb_function void *ogl4_load_proc(char *proc_name) {
+fn_internal void *ogl4_load_proc(char *proc_name) {
   void *ptr = (void *)glXGetProcAddress((const GLubyte *)proc_name);
   if (!ptr) {
     // TODO(cmat): core_panic should be able to format strings? Or that's for logging only?
@@ -35,7 +35,7 @@ cb_function void *ogl4_load_proc(char *proc_name) {
   return ptr;
 }
 
-cb_function void ogl4_load_api(void) {
+fn_internal void ogl4_load_api(void) {
   // NOTE(cmat): Load all OpenGL4 function pointers.
   OGL4_Load_Proc(glCreateBuffers);
   OGL4_Load_Proc(glBindBuffer);
@@ -86,7 +86,7 @@ typedef struct OGL4_Shader {
   GLuint program;
 } OGL4_Shader;
 
-cb_global struct {
+var_global struct {
   B32 initialized;
  
   U32 buffer_last_id;
@@ -103,11 +103,11 @@ cb_global struct {
 
 } OGL4_State;
 
-cb_function R_Buffer r_buffer_allocate(U64 capacity, R_Buffer_Mode mode) {
+fn_internal R_Buffer r_buffer_allocate(U64 capacity, R_Buffer_Mode mode) {
   OGL4_Buffer *ogl4_buffer = &OGL4_State.buffers[OGL4_State.buffer_last_id++];
   glCreateBuffers(1, &ogl4_buffer->buffer);
 
-  cb_local_persist GLenum OGL4_Mode_Map[] = {
+  var_local_persist GLenum OGL4_Mode_Map[] = {
     GL_STATIC_DRAW,  // R_Buffer_Mode_Static
     GL_DYNAMIC_DRAW, // R_Buffer_Mode_Dynamic
   };
@@ -122,18 +122,18 @@ cb_function R_Buffer r_buffer_allocate(U64 capacity, R_Buffer_Mode mode) {
   return result;
 }
 
-cb_function void r_buffer_download(R_Buffer *buffer, U64 offset, U64 bytes, void *data) {
+fn_internal void r_buffer_download(R_Buffer *buffer, U64 offset, U64 bytes, void *data) {
   OGL4_Buffer *ogl4_buffer = &OGL4_State.buffers[buffer->id - 1];
   glBindBuffer(GL_ARRAY_BUFFER, ogl4_buffer->buffer);
   glBufferSubData(GL_ARRAY_BUFFER, offset, bytes, data);
 }
 
 // TODO(cmat): Implement this.
-cb_function void r_buffer_destroy(R_Buffer *buffer) {
+fn_internal void r_buffer_destroy(R_Buffer *buffer) {
   Not_Implemented;
 }
 
-cb_function R_Texture r_texture_allocate (R_Texture_Config *config) {
+fn_internal R_Texture r_texture_allocate (R_Texture_Config *config) {
   OGL4_Texture *ogl4_texture = &OGL4_State.textures[OGL4_State.texture_last_id++];
   ogl4_texture->width   = config->width;
   ogl4_texture->height  = config->height;
@@ -146,23 +146,23 @@ cb_function R_Texture r_texture_allocate (R_Texture_Config *config) {
   return result;
 }
 
-cb_function void r_texture_download (R_Texture *texture, U08 *texture_data) {
+fn_internal void r_texture_download (R_Texture *texture, U08 *texture_data) {
   OGL4_Texture *ogl4_texture = &OGL4_State.textures[texture->id - 1];
   glBindTexture(GL_TEXTURE_2D, ogl4_texture->texture);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ogl4_texture->width, ogl4_texture->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_data);
 }
 
-cb_function void r_texture_destroy  (R_Texture *texture) {
+fn_internal void r_texture_destroy  (R_Texture *texture) {
 }
 
 
-cb_function R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format format) {
+fn_internal R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format format) {
   R_Pipeline result = { };
   return result;
 }
 
 // TODO(cmat): Redundant.
-cb_function void ogl4_create_default_textures(void) {
+fn_internal void ogl4_create_default_textures(void) {
   R_Texture_Config white_texture_conf = {
     .format = R_Texture_Format_RGBA_U08_Normalized,
     .width  = 2,
@@ -178,7 +178,7 @@ cb_function void ogl4_create_default_textures(void) {
   r_texture_download(&R_Texture_White, (U08 *)white_texture_data);
 }
 
-cb_function GLuint ogl4_compile_shader(char *source, GLenum type) {
+fn_internal GLuint ogl4_compile_shader(char *source, GLenum type) {
   GLuint shader = glCreateShader(type);
 
   const char *gl_source = (const char *)source;
@@ -203,7 +203,7 @@ cb_function GLuint ogl4_compile_shader(char *source, GLenum type) {
   return shader;
 }
 
-cb_function GLuint ogl4_create_program(char *vertex_source, char *fragment_source) {
+fn_internal GLuint ogl4_create_program(char *vertex_source, char *fragment_source) {
   GLuint vertex_shader    = ogl4_compile_shader(vertex_source,   GL_VERTEX_SHADER);
   GLuint fragment_shader  = ogl4_compile_shader(fragment_source, GL_FRAGMENT_SHADER);
 
@@ -234,7 +234,7 @@ cb_function GLuint ogl4_create_program(char *vertex_source, char *fragment_sourc
   return program;
 }
 
-cb_function void ogl4_create_default_shaders(void) {
+fn_internal void ogl4_create_default_shaders(void) {
   OGL4_Shader *flat_2D_shader  = &OGL4_State.shaders[OGL4_State.shader_last_id++];
   flat_2D_shader->program      = ogl4_create_program(ogl4_shader_vertex_flat_2D, ogl4_shader_pixel_flat_2D);
   R_Shader_Flat_2D             = (R_Shader) { .id = OGL4_State.shader_last_id };
@@ -248,7 +248,7 @@ cb_function void ogl4_create_default_shaders(void) {
   R_Shader_MTSDF_2D            = (R_Shader) { .id = OGL4_State.shader_last_id };
 }
 
-cb_function void r_init(Platform_Render_Context *render_context) {
+fn_internal void r_init(Platform_Render_Context *render_context) {
   ogl4_load_api();
 
   // NOTE(cmat): Create default resources.
@@ -257,7 +257,7 @@ cb_function void r_init(Platform_Render_Context *render_context) {
   ogl4_create_default_textures();
 }
 
-cb_function void r_frame_flush(void) {
+fn_internal void r_frame_flush(void) {
   glClearColor(.1f, .1f, .8f, 1.f);
   glClear(GL_COLOR_BUFFER_BIT);
 }

@@ -1,13 +1,13 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-cb_global Core_Context macos_context = {};
+var_global Core_Context macos_context = {};
 
-cb_function Core_Context *core_context(void) {
+fn_internal Core_Context *core_context(void) {
   return &macos_context;
 }
 
-cb_function void core_stream_write(Str buffer, Core_Stream stream) {
+fn_internal void core_stream_write(Str buffer, Core_Stream stream) {
   I32 unix_handle = 0;
   
   switch(stream) {
@@ -19,14 +19,14 @@ cb_function void core_stream_write(Str buffer, Core_Stream stream) {
   write(unix_handle, buffer.txt, buffer.len);
 }
 
-cb_function void core_panic(Str reason) {
+fn_internal void core_panic(Str reason) {
   core_stream_write(str_lit("## PANIC -- Aborting Execution ##\n"), Core_Stream_Standard_Error);
   core_stream_write(reason, Core_Stream_Standard_Error);
   core_stream_write(str_lit("\n"), Core_Stream_Standard_Error);
   syscall(SYS_exit, 1);
 }
 
-cb_function Local_Time core_local_time(void) {
+fn_internal Local_Time core_local_time(void) {
   clock_serv_t maccore_clock;
   mach_timespec_t time_spec;
   host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &maccore_clock);
@@ -42,7 +42,7 @@ cb_function Local_Time core_local_time(void) {
   return local_time;  
 }
 
-cb_function U08 *core_memory_reserve(U64 bytes) {
+fn_internal U08 *core_memory_reserve(U64 bytes) {
   mach_port_t   task    = mach_task_self();
   vm_address_t  address = 0;
   kern_return_t error   = vm_allocate(task, &address, (size_t)bytes, VM_FLAGS_ANYWHERE);
@@ -54,12 +54,12 @@ cb_function U08 *core_memory_reserve(U64 bytes) {
   return (U08 *)address;
 }
 
-cb_function void core_memory_unreserve(void *virtual_base, U64 bytes) {
+fn_internal void core_memory_unreserve(void *virtual_base, U64 bytes) {
   mach_port_t task = mach_task_self();
   vm_deallocate(task, (vm_address_t)virtual_base, bytes);
 }
 
-cb_function void core_memory_commit(void *virtual_base, U64 bytes, Core_Commit_Flag mode) {
+fn_internal void core_memory_commit(void *virtual_base, U64 bytes, Core_Commit_Flag mode) {
   mach_port_t   task  = mach_task_self();
   vm_prot_t     prot  = 0;
   kern_return_t error = 0;
@@ -74,7 +74,7 @@ cb_function void core_memory_commit(void *virtual_base, U64 bytes, Core_Commit_F
   }
 }
 
-cb_function void core_memory_uncommit(void *virtual_base, U64 bytes) {
+fn_internal void core_memory_uncommit(void *virtual_base, U64 bytes) {
   mach_port_t   task  = mach_task_self();
   kern_return_t error = vm_protect(task, (vm_address_t)virtual_base, bytes, 0, VM_PROT_NONE);
   if (error != KERN_SUCCESS) {

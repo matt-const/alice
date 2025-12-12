@@ -6,26 +6,26 @@
 
 #define WASM_Not_Supported(proc_) core_panic(str_lit(Macro_Stringize(proc_) ": not supported on WASM backend."));
 
-cb_function B32       core_directory_create (Str folder_path)                                     { WASM_Not_Supported(core_directory_create); return 0;            }
-cb_function B32       core_directory_delete (Str folder_path)                                     { WASM_Not_Supported(core_directory_delete); return 0;            }
-cb_function Core_File core_file_open        (Str file_path, Core_File_Access_Flag flags)          { WASM_Not_Supported(core_file_open); return (Core_File) { };     }
-cb_function U64       core_file_size        (Core_File *file)                                     { WASM_Not_Supported(core_file_size); return 0; return 0;         }
-cb_function void      core_file_write       (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_write);                            }
-cb_function void      core_file_read        (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_read);                             }
-cb_function void      core_file_close       (Core_File *file)                                     { WASM_Not_Supported(core_file_close);                            }
+fn_internal B32       core_directory_create (Str folder_path)                                     { WASM_Not_Supported(core_directory_create); return 0;            }
+fn_internal B32       core_directory_delete (Str folder_path)                                     { WASM_Not_Supported(core_directory_delete); return 0;            }
+fn_internal Core_File core_file_open        (Str file_path, Core_File_Access_Flag flags)          { WASM_Not_Supported(core_file_open); return (Core_File) { };     }
+fn_internal U64       core_file_size        (Core_File *file)                                     { WASM_Not_Supported(core_file_size); return 0; return 0;         }
+fn_internal void      core_file_write       (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_write);                            }
+fn_internal void      core_file_read        (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_read);                             }
+fn_internal void      core_file_close       (Core_File *file)                                     { WASM_Not_Supported(core_file_close);                            }
 
 // ------------------------------------------------------------
 // #-- JS - WASM core API.
-extern void js_core_stream_write  (U32 stream_mode, U32 string_len, char *string_txt);
-extern F64  js_core_unix_time     (void);
-extern void js_core_panic         (U32 string_len, char *string_txt);
+fn_external void js_core_stream_write  (U32 stream_mode, U32 string_len, char *string_txt);
+fn_external F64  js_core_unix_time     (void);
+fn_external void js_core_panic         (U32 string_len, char *string_txt);
 
-cb_global Core_Context wasm_context = { };
-cb_function Core_Context *core_context(void) {
+var_global Core_Context wasm_context = { };
+fn_internal Core_Context *core_context(void) {
   return &wasm_context;
 }
 
-cb_function void core_stream_write(Str buffer, Core_Stream stream) {
+fn_internal void core_stream_write(Str buffer, Core_Stream stream) {
   U32 stream_mode = 1;
   switch (stream) {
     case Core_Stream_Standard_Output: { stream_mode = 1; } break;
@@ -36,11 +36,11 @@ cb_function void core_stream_write(Str buffer, Core_Stream stream) {
   js_core_stream_write(stream_mode, (U32)buffer.len, (char *)buffer.txt);
 }
 
-cb_function void core_panic(Str reason) {
+fn_internal void core_panic(Str reason) {
   js_core_panic((U32)reason.len, (char *)reason.txt);
 }
 
-cb_function Local_Time core_local_time(void) {
+fn_internal Local_Time core_local_time(void) {
   Local_Time result     = { };
   U64 time_since_epoch  = (U64)js_core_unix_time();
   U64 unix_seconds      = time_since_epoch / 1000;
@@ -63,12 +63,12 @@ void  free  (void *ptr);
 // - managment primitives, but given how things have been going with the standard...
 // - not holding my breath.
 
-cb_function U08 *core_memory_reserve(U64 bytes) {
+fn_internal U08 *core_memory_reserve(U64 bytes) {
   U08 *result = (U08 *)malloc(bytes);
   return result;
 }
 
-cb_function void core_memory_unreserve  (void *virtual_base, U64 bytes) {
+fn_internal void core_memory_unreserve  (void *virtual_base, U64 bytes) {
   // TODO(cmat): This ignores bytes, which is technically fine for the current arena allocator,
   // - but is definitely not fine otherwise.
   // - Maybe the correct solution is to actually just store bytes in any allocation upfront in a header,
@@ -76,15 +76,14 @@ cb_function void core_memory_unreserve  (void *virtual_base, U64 bytes) {
   free(virtual_base);
 }
 
-cb_function void core_memory_commit   (void *virtual_base, U64 bytes, Core_Commit_Flag mode)  { }
-cb_function void core_memory_uncommit (void *virtual_base, U64 bytes)                         { }
-
+fn_internal void core_memory_commit   (void *virtual_base, U64 bytes, Core_Commit_Flag mode)  { }
+fn_internal void core_memory_uncommit (void *virtual_base, U64 bytes)                         { }
 
 // ------------------------------------------------------------
 // #-- WASM entry point.
 
 __attribute__((export_name("wasm_entry_point")))
-void wasm_entry_point(U32 cpu_logical_cores) {
+fn_entry void wasm_entry_point(U32 cpu_logical_cores) {
   wasm_context.cpu_name           = str_lit("WASM VM");
   wasm_context.cpu_logical_cores  = cpu_logical_cores;
   wasm_context.mmu_page_bytes     = u64_kilobytes(64);

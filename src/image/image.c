@@ -24,7 +24,7 @@ typedef struct IM_TGA_Header {
 
 #pragma pack(pop)
 
-cb_function inline void im_bitmap_write_file_tga(IM_Bitmap *bitmap, Core_File *file) {
+fn_internal inline void im_bitmap_write_file_tga(IM_Bitmap *bitmap, Core_File *file) {
   if (bitmap->channels != 3) Not_Implemented;
 
   IM_TGA_Header header = {
@@ -52,7 +52,7 @@ cb_function inline void im_bitmap_write_file_tga(IM_Bitmap *bitmap, Core_File *f
 // ------------------------------------------------------------
 // #-- Image API
 
-cb_function inline IM_Bitmap im_bitmap_allocate(Arena *arena, U32 width, U32 height, U32 channels) {
+fn_internal inline IM_Bitmap im_bitmap_allocate(Arena *arena, U32 width, U32 height, U32 channels) {
   IM_Bitmap result = {
     .width    = width,
     .height   = height,
@@ -63,7 +63,7 @@ cb_function inline IM_Bitmap im_bitmap_allocate(Arena *arena, U32 width, U32 hei
   return result;
 }
 
-cb_function inline void im_bitmap_write_file(IM_Bitmap *bitmap, Str filepath, IM_File_Format format) {
+fn_internal inline void im_bitmap_write_file(IM_Bitmap *bitmap, Str filepath, IM_File_Format format) {
   Core_File file = { };
   File_IO_Scope(&file, filepath, Core_File_Access_Flag_Create | Core_File_Access_Flag_Truncate | Core_File_Access_Flag_Write) {
     switch (format) {
