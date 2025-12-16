@@ -184,7 +184,7 @@ fn_internal void g2_draw_tri_ext(G2_Tri *tri) {
   entry.indices[1]  = entry.base_index + 1;
   entry.indices[2]  = entry.base_index + 2;
   
-  U32 packed_color  = abgr_u32_from_rgba(tri->color);
+  U32 packed_color  = abgr_u32_from_rgba_premul(tri->color);
   entry.vertices[0] = (R_Vertex_XUC_2D) { .X = tri->x1, .C = packed_color, .U = tri->u1, };
   entry.vertices[1] = (R_Vertex_XUC_2D) { .X = tri->x2, .C = packed_color, .U = tri->u2, };
   entry.vertices[2] = (R_Vertex_XUC_2D) { .X = tri->x3, .C = packed_color, .U = tri->u3, };
@@ -200,7 +200,7 @@ fn_internal void g2_draw_rect_ext(G2_Rect *rect) {
   entry.indices[4] = entry.base_index + 2;
   entry.indices[5] = entry.base_index + 3;
   
-  U32 packed_color = abgr_u32_from_rgba(rect->color);
+  U32 packed_color = abgr_u32_from_rgba_premul(rect->color);
 
   V2F X0 = rect->pos;
   V2F X1 = v2f_add(rect->pos, v2f(rect->size.x, 0));
@@ -219,7 +219,109 @@ fn_internal void g2_draw_rect_ext(G2_Rect *rect) {
 }
 
 fn_internal void g2_draw_rect_rounded_ext(G2_Rect_Rounded *rect) {
-  Not_Implemented;
+  U32 vertex_count = 3 * 4 + rect->segments * 4;
+
+  U32 index_count = 0;
+  if (rect->segments) {
+    index_count = 3 * 6 + 4 * (6 + (rect->segments - 1) * 3);
+  } else {
+    index_count = 3 * 6 + 4 * 6;
+  }
+
+  G2_Draw_Entry entry = g2_push_draw(vertex_count, index_count, R_Texture_White, G2_Draw_Mode_Flat);
+
+  U32 index_at = 0;
+
+  // NOTE(cmat): Inner + Outer rectangles.
+  For_U32 (it, 3) {
+    entry.indices[index_at++] = entry.base_index + 4 * it + 0;
+    entry.indices[index_at++] = entry.base_index + 4 * it + 1;
+    entry.indices[index_at++] = entry.base_index + 4 * it + 2;
+
+    entry.indices[index_at++] = entry.base_index + 4 * it + 0;
+    entry.indices[index_at++] = entry.base_index + 4 * it + 2;
+    entry.indices[index_at++] = entry.base_index + 4 * it + 3;
+  }
+
+  // NOTE(cmat): TL corner.
+#define Push_Corner_Indices(corner_index_, first_, center_, last_)                      \
+do {                                                                                    \
+  U32 offset = 12 + corner_index_ * rect->segments;                                     \
+  if (rect->segments) {                                                                 \
+    entry.indices[index_at++] = entry.base_index + first_;                              \
+    entry.indices[index_at++] = entry.base_index + center_;                             \
+    entry.indices[index_at++] = entry.base_index + offset + 0;                          \
+    For_U32(it, rect->segments - 1) {                                                   \
+      entry.indices[index_at++] = entry.base_index + offset + it;                       \
+      entry.indices[index_at++] = entry.base_index + center_;                           \
+      entry.indices[index_at++] = entry.base_index + offset + it + 1;                   \
+    }                                                                                   \
+    entry.indices[index_at++] = entry.base_index + offset + (rect->segments - 1);       \
+    entry.indices[index_at++] = entry.base_index + center_;                             \
+    entry.indices[index_at++] = entry.base_index + last_;                               \
+  } else {                                                                              \
+    entry.indices[index_at++] = entry.base_index + first_;                              \
+    entry.indices[index_at++] = entry.base_index + center_;                             \
+    entry.indices[index_at++] = entry.base_index + last_;                               \
+  }                                                                                     \
+} while (0)
+
+  Push_Corner_Indices(0, 3, 4,  7);
+  Push_Corner_Indices(1, 6, 5,  2);
+  Push_Corner_Indices(2, 8, 11, 0);
+  Push_Corner_Indices(3, 1, 10, 9);
+
+  U32 vertex_at = 0;
+  U32 packed_color = abgr_u32_from_rgba_premul(rect->color);
+
+  // NOTE(cmat): Inner vertices.
+  V2F inner_bl = v2f(rect->pos.x, rect->pos.y + rect->radius);
+  V2F inner_tr = v2f(rect->pos.x + rect->size.x, rect->pos.y + rect->size.y - rect->radius);
+
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = inner_bl,                    .C = packed_color, .U = v2f(0.f, 0.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = v2f(inner_tr.x, inner_bl.y), .C = packed_color, .U = v2f(1.f, 0.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = inner_tr,                    .C = packed_color, .U = v2f(1.f, 1.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = v2f(inner_bl.x, inner_tr.y), .C = packed_color, .U = v2f(0.f, 1.f) };
+ 
+  // NOTE(cmat): Upper vertices
+  V2F upper_bl = v2f(rect->pos.x + rect->radius, inner_tr.y);
+  V2F upper_tr = v2f(rect->pos.x + rect->size.x - rect->radius, rect->pos.y + rect->size.y);
+
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = upper_bl,                    .C = packed_color, .U = v2f(0.f, 0.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = v2f(upper_tr.x, upper_bl.y), .C = packed_color, .U = v2f(1.f, 0.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = upper_tr,                    .C = packed_color, .U = v2f(1.f, 1.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = v2f(upper_bl.x, upper_tr.y), .C = packed_color, .U = v2f(0.f, 1.f) };
+
+  // NOTE(cmat): Lower vertices
+  V2F lower_bl = v2f(rect->pos.x + rect->radius,                rect->pos.y);
+  V2F lower_tr = v2f(rect->pos.x + rect->size.x - rect->radius, rect->pos.y + rect->radius);
+
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = lower_bl,                    .C = packed_color, .U = v2f(0.f, 0.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = v2f(lower_tr.x, lower_bl.y), .C = packed_color, .U = v2f(1.f, 0.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = lower_tr,                    .C = packed_color, .U = v2f(1.f, 1.f) };
+  entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = v2f(lower_bl.x, lower_tr.y), .C = packed_color, .U = v2f(0.f, 1.f) };
+
+  // NOTE(cmat): Segments TL
+  F32 corner_theta_table[]  = { 2 * f32_hpi, f32_hpi, 3 * f32_hpi, 0 };
+  V2F corner_pos_table[]    = {
+    v2f(inner_bl.x + rect->radius, inner_tr.y),
+    v2f(inner_tr.x - rect->radius, inner_tr.y),
+    v2f(inner_bl.x + rect->radius, inner_bl.y),
+    v2f(inner_tr.x - rect->radius, inner_bl.y) };
+
+  For_U32 (it_corner, 4) {
+    F32 corner_theta = corner_theta_table[it_corner];
+    V2F corner_pos   = corner_pos_table[it_corner];
+    For_U32 (it_seg, rect->segments) {
+      F32 theta = corner_theta - f32_hpi * ((F32)(it_seg + 1) / (F32)(rect->segments + 1));
+      V2F offset = v2f_mul(rect->radius, v2f(f32_cos(theta), f32_sin(theta)));
+      V2F pos = v2f_add(corner_pos, offset);
+      entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = pos, .C = packed_color, .U = v2f(0.f, 0.f) };
+    }
+  }
+
+  Assert(vertex_at == vertex_count, "vertex_at != vertex_count");
+  Assert(index_at  == index_count,  "index_at  != index_count");
 }
 
 fn_internal void g2_draw_disk_ext(G2_Disk *disk) {
@@ -232,7 +334,7 @@ fn_internal void g2_draw_disk_ext(G2_Disk *disk) {
     entry.indices[3 * it + 2] = entry.base_index + 1 + ((it + 1) % resolution);
   }
 
-  U32 packed_color = abgr_u32_from_rgba(disk->color);
+  U32 packed_color = abgr_u32_from_rgba_premul(disk->color);
   entry.vertices[0] = (R_Vertex_XUC_2D) { .X = disk->pos, .C = packed_color, .U = v2f(0, 0), };
   For_U32(it, resolution) {
     F32 theta = (F32)it / (F32)resolution * f32_2pi;
@@ -261,7 +363,7 @@ fn_internal void g2_draw_line_ext(G2_Line *line) {
   V2F normal_1 = v2f_mul(line->thickness / 2, v2f(-delta.y,  delta.x));
   V2F normal_2 = v2f_mul(line->thickness / 2, v2f( delta.y, -delta.x));
 
-  U32 packed_color = abgr_u32_from_rgba(line->color);
+  U32 packed_color = abgr_u32_from_rgba_premul(line->color);
   entry.vertices[0] = (R_Vertex_XUC_2D) { .X = v2f_add(line->start, normal_1), .C = packed_color, .U = v2f(0, 0), };
   entry.vertices[1] = (R_Vertex_XUC_2D) { .X = v2f_add(line->start, normal_2), .C = packed_color, .U = v2f(0, 0), };
   entry.vertices[2] = (R_Vertex_XUC_2D) { .X = v2f_add(line->end,   normal_2), .C = packed_color, .U = v2f(0, 0), };
@@ -284,7 +386,7 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
 
     decode_at += advance;
 
-    FO_Glyph *g = fo_font_glyph_get(text->font, codepoint);
+    FO_Glyph *g = fo_glyph_get(text->font, codepoint);
     draw_glyph_count += !g->no_texture;
   }
 
@@ -302,7 +404,7 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
     entry.indices[index_at++] = base_index + 3;
   }
 
-  U32 packed_color = abgr_u32_from_rgba(text->color);
+  U32 packed_color = abgr_u32_from_rgba_premul(text->color);
 
   V2F draw_at = text->pos;
   
@@ -319,7 +421,7 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
 
     decode_at += advance;
 
-    FO_Glyph *g = fo_font_glyph_get(text->font, codepoint);
+    FO_Glyph *g = fo_glyph_get(text->font, codepoint);
     if (!g->no_texture) {
 
       V2F offset = v2f(g->pen_offset.x, g->pen_offset.y);

@@ -65,6 +65,16 @@ fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 fo
   Scratch_Scope(&scratch, arena) {
     U08 *texture_data = arena_push_count(scratch.arena, U08, 4 * atlas_size.x * atlas_size.y);
     F32 scale         = stbtt_ScaleForPixelHeight(&font_info, font_size);
+ 
+    I32 ascent    = 0;
+    I32 descent   = 0;
+    I32 line_gap  = 0;
+    stbtt_GetFontVMetrics(&font_info, &ascent, &descent, &line_gap);
+
+    font->metric_em       = f32_ceil(font_size);
+    font->metric_ascent   = f32_ceil(scale * ascent);
+    font->metric_descent  = -f32_ceil(-scale * descent);
+    font->metric_line_gap = f32_ceil(scale * line_gap);
 
     Skyline_Packer sk = { };
     skyline_packer_init(&sk, scratch.arena, atlas_size);
@@ -72,7 +82,7 @@ fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 fo
     For_I64(it_codepoint, codepoints.len) {
       U32 codepoint = codepoints.dat[it_codepoint];
 
-      FO_Glyph *glyph = fo_font_glyph_add(font, arena, codepoint);
+      FO_Glyph *glyph = fo_glyph_add(font, arena, codepoint);
 
       I32 glyph_width  = 0;
       I32 glyph_height = 0;
@@ -123,7 +133,7 @@ fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 fo
   STBTT_backend_free();
 }
 
-fn_internal FO_Glyph *fo_font_glyph_add(FO_Font *font, Arena *arena, Codepoint codepoint) {
+fn_internal FO_Glyph *fo_glyph_add(FO_Font *font, Arena *arena, Codepoint codepoint) {
   U64 bucket_index    = codepoint % font->glyph_bucket_count;
   FO_Glyph_List *list = font->glyph_bucket_array + bucket_index;
 
@@ -139,7 +149,7 @@ fn_internal FO_Glyph *fo_font_glyph_add(FO_Font *font, Arena *arena, Codepoint c
   return list->last;
 }
 
-fn_internal FO_Glyph *fo_font_glyph_get(FO_Font *font, Codepoint codepoint) {
+fn_internal FO_Glyph *fo_glyph_get(FO_Font *font, Codepoint codepoint) {
   U64 bucket_index    = codepoint % font->glyph_bucket_count;
   FO_Glyph_List *list = font->glyph_bucket_array + bucket_index;
 
@@ -155,3 +165,29 @@ fn_internal FO_Glyph *fo_font_glyph_get(FO_Font *font, Codepoint codepoint) {
   return entry;
 }
 
+fn_internal F32 fo_text_width(FO_Font *font, Str text) {
+  F32 width = 0;
+
+  I32 decode_at = 0;
+  for (;;) {
+    if (decode_at >= text.len) break;
+    Str decode_str = str_slice(text, decode_at, text.len - decode_at);
+
+    I32 advance = 0;
+    U32 codepoint = codepoint_from_utf8(decode_str, &advance);
+    if (!advance) {
+      advance = 1;
+    }
+
+    decode_at += advance;
+
+    FO_Glyph *g = fo_glyph_get(font, codepoint);
+    if (decode_at < text.len) {
+      width += g->pen_advance;
+    } else {
+      width += g->bounds.x + g->pen_offset.x;
+    }
+  }
+
+  return width;
+}

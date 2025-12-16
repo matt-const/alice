@@ -38,7 +38,9 @@ fn_internal U08 *arena_chunk_allocate(Arena_Chunk *chunk, U64 bytes, Arena_Push 
 fn_internal void arena_chunk_deallocate(Arena_Chunk *chunk) {
   Arena_Chunk chunk_header = {
     .header = {
+#if BUILD_DEBUG
       .magic        = arena_chunk_magic,
+#endif
     },
 
     .base_memory    = chunk->base_memory,
@@ -524,6 +526,20 @@ fn_internal RGBA_U32 rgba_u32_from_rgba(RGBA rgba) {
 fn_internal RGBA_U32 abgr_u32_from_rgba(RGBA rgba) {
   U32 packed = ((U32)(U08)(rgba.a * 255.f) << 24) | ((U32)(U08)(rgba.b * 255.f) << 16) | ((U32)(U08)(rgba.g * 255.f) <<  8) | ((U32)(U08)(rgba.r * 255.f));
   return packed;
+}
+
+fn_internal RGBA_U32 rgba_u32_from_rgba_premul(RGBA rgba) {
+  rgba.r *= rgba.a;
+  rgba.g *= rgba.a;
+  rgba.b *= rgba.a;
+  return rgba_u32_from_rgba(rgba);
+}
+
+fn_internal RGBA_U32 abgr_u32_from_rgba_premul(RGBA rgba) {
+  rgba.r *= rgba.a;
+  rgba.g *= rgba.a;
+  rgba.b *= rgba.a;
+  return abgr_u32_from_rgba(rgba);
 }
 
 // ------------------------------------------------------------

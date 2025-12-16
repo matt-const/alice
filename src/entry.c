@@ -1,6 +1,7 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
+
 #include "core/core_build.h"
 #include "core/core_build.c"
 
@@ -58,9 +59,14 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
 
   g2_draw_rect(v2f(-5000, platform_input()->mouse.position.y), v2f(10000, 2));
   g2_draw_rect(v2f(platform_input()->mouse.position.x, -5000), v2f(2, 10000));
+  F32 width = fo_text_width(&UI_Font, str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"));
+  V2F pos   = v2f_add(platform_input()->mouse.position, v2f(0, UI_Font.metric_descent));
+  
+  pos.x -= UI_Font.metric_em/4;
+  width += 2 * UI_Font.metric_em/4;
+  g2_draw_rect(pos, v2f(width, UI_Font.metric_ascent + -UI_Font.metric_descent), .color = v4f(.8f, .2f, .2f, 0.5f));
 
-  g2_draw_text(str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"), &UI_Font, platform_input()->mouse.position);
-  g2_draw_text(str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"), &UI_Font, platform_input()->mouse.position, .rot_deg = 90);
+  g2_draw_text(str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"), &UI_Font, platform_input()->mouse.position, .color = v4f(1, 1, 1, 1.0f));
 
   g2_draw_text(str_lit(TEST_STR), &ICO_Font, v2f_add(platform_input()->mouse.position, v2f(50, 50)));
 

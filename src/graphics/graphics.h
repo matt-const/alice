@@ -59,7 +59,7 @@ fn_internal void g2_draw_rect_ext(G2_Rect *rect);
 
 typedef struct G2_Rect_Rounded {
   F32       radius;
-  F32       resolution;
+  F32       segments;
   V2F       pos;
   V2F       size;
   RGBA      color;
@@ -67,15 +67,12 @@ typedef struct G2_Rect_Rounded {
 
 fn_internal void g2_draw_rounded_rect_ext(G2_Rect_Rounded *rect);
 #define g2_draw_rect_rounded(pos_, size_, radius_, ...)       \
-  g2_draw_rect_rounded_ext(&(G2_Rect) {                       \
+  g2_draw_rect_rounded_ext(&(G2_Rect_Rounded) {               \
       .radius         = radius_,                              \
-      .resolution     = 32,                                   \
+      .segments       = 6,                                    \
       .pos            = pos_,                                 \
       .size           = size_,                                \
-      .uv_bl          = v2f(0, 0),                            \
-      .uv_tr          = v2f(1, 1),                            \
       .color          = v4f(1, 1, 1, 1),                      \
-      .tex            = R_Texture_White,                      \
       ##__VA_ARGS__,                                          \
   })
 

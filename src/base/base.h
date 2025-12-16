@@ -1022,6 +1022,12 @@ Assert_Compiler(sizeof(M4_F64) == 4 * 4 * sizeof(F64));
 // ------------------------------------------------------------
 // #-- Region Types
 
+typedef U32 Axis2;
+enum {
+  Axis2_X = 0,
+  Axis2_Y = 1,
+};
+
 #pragma pack(push, 1)
 
 typedef union Region2_I32 {
@@ -1391,6 +1397,9 @@ fn_internal RGBA      rgba_from_hsva     (HSVA rgb);
 fn_internal HSVA      hsva_from_rgba     (RGBA hsv);
 fn_internal RGBA_U32  rgba_u32_from_rgba (RGBA_F32 rgba);
 fn_internal RGBA_U32  abgr_u32_from_rgba (RGBA_F32 rgba);
+
+fn_internal RGBA_U32  rgba_u32_from_rgba_premul (RGBA_F32 rgba);
+fn_internal RGBA_U32  abgr_u32_from_rgba_premul (RGBA_F32 rgba);
 
 // ------------------------------------------------------------
 // #-- Interpolation

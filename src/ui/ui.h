@@ -1,8 +1,57 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-// NOTE(cmat): Implementation based on Ryan J. Fleury's article
-// https://www.rfleury.com/p/ui-part-2-build-it-every-frame-immediate?utm_source=publication-search
+typedef U32 UI_Size_Type;
+enum {
+  UI_Size_Type_Fit = 0, // NOTE(cmat): Default.
+  UI_Size_Type_Fixed,
+  UI_Size_Type_Text,
+};
+
+typedef struct UI_Size {
+  UI_Size_Type  type;
+  F32           value;
+} UI_Size;
+
+#define UI_Size_Fixed(pixels_)  (UI_Size) { .type = UI_Size_Type_Fixed, .value = (F32)(pixels_) }
+#define UI_Size_Text            (UI_Size) { .type = UI_Size_Type_Text                           }
+#define UI_Size_Fit             (UI_Size) { .type = UI_Size_Type_Fit                            }
+
+typedef struct UI_NTree {
+  UI_Node *parent;
+  UI_Node *first;
+  UI_Node *last;
+  UI_Node *next;
+  UI_Node *child_first;
+} UI_NTree;
+
+typedef U32 UI_Layout_Flag;
+enum {
+  UI_Layout_Flag_Float_X = 1 << 0,
+  UI_Layout_Flag_Float_Y = 1 << 1,
+};
+
+typedef struct UI_Layout {
+  UI_Layout_Flag  flags;
+  Axis2           direction;
+  UI_Size         size;
+  I32             border_gap;
+  I32             child_gap;
+} UI_Layout;
+
+typedef struct UI_Visual {
+  V4F background;
+} UI_Visual;
+
+typedef struct UI_Node {
+  UI_Node  *hash_next; // NOTE(cmat): Hash table
+  UI_NTree *tree_node; // NOTE(cmat): Tree hierarchy.
+  UI_Layout layout;    // NOTE(cmat): Layout information.
+  UI_Visual visual;    // NOTE(cmat): Colors to use.
+
+} UI_Node;
+
+#if 0
 
 typedef U64 UI_ID;
 fn_internal UI_ID ui_id_from_str(Str string);
@@ -87,3 +136,6 @@ typedef struct UI_Node {
   B32             first_frame;
 } UI_Node;
 
+
+
+#endif
