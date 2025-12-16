@@ -151,33 +151,41 @@ fn_internal Codepoint codepoint_from_utf8(Str str_utf8, I32 *advance) {
 
     if (c0 < 0x80) {  // NOTE(cmat): 0xxxxxxx
       result = c0;
-      *advance += 1;
+      if (advance) {
+        *advance += 1;
+      }
 
     } else if ((c0 & 0xE0) == 0xC0) { // NOTE(cmat): 110xxxxx 10xxxxxx
       Assert(str_utf8.len >= 2, "utf8-decode missing 2 bytes");
       if (str_utf8.len >= 2) {
         result = c0 & 0x1F;
-        result = (c0 << 6) | (str_utf8.txt[1] & 0x3F);
-        *advance += 2;
+        result = (result << 6) | (str_utf8.txt[1] & 0x3F);
+        if (advance) {
+          *advance += 2;
+        }
       }
 
     } else if ((c0 & 0xF0) == 0xE0) { // NOTE(cmat): 1110xxxxx 10xxxxx 10xxxxxx
       Assert(str_utf8.len >= 3, "utf8-decode missing 3 bytes");
       if (str_utf8.len >= 3) {
         result = c0 & 0x0F;
-        result = (c0 << 6) | (str_utf8.txt[1] & 0x3F);
-        result = (c0 << 6) | (str_utf8.txt[2] & 0x3F);
-        *advance += 3;
+        result = (result << 6) | (str_utf8.txt[1] & 0x3F);
+        result = (result << 6) | (str_utf8.txt[2] & 0x3F);
+        if (advance) {
+          *advance += 3;
+        }
       }
 
     } else if ((c0 & 0xF8) == 0xF0) { // NOTE(cmat): 11110xxx 10xxxxx 10xxxxx 10xxxxxx
       Assert(str_utf8.len >= 4, "utf8-decode missing 4 bytes");
       if (str_utf8.len >= 4) {
         result = c0 & 0x07;
-        result = (c0 << 6) | (str_utf8.txt[1] & 0x3F);
-        result = (c0 << 6) | (str_utf8.txt[2] & 0x3F);
-        result = (c0 << 6) | (str_utf8.txt[3] & 0x3F);
-        *advance += 4;
+        result = (result << 6) | (str_utf8.txt[1] & 0x3F);
+        result = (result << 6) | (str_utf8.txt[2] & 0x3F);
+        result = (result << 6) | (str_utf8.txt[3] & 0x3F);
+        if (advance) {
+          *advance += 4;
+        }
       }
 
     } else {
@@ -185,7 +193,7 @@ fn_internal Codepoint codepoint_from_utf8(Str str_utf8, I32 *advance) {
     }
   }
 
-  return 0;
+  return result;
 }
 
 

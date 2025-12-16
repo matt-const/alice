@@ -271,8 +271,20 @@ fn_internal void g2_draw_line_ext(G2_Line *line) {
 fn_internal void g2_draw_text_ext(G2_Text *text) {
   U32 draw_glyph_count = 0;
 
-  For_U32(it, text->text.len) {
-    FO_Glyph *g = fo_font_glyph_get(text->font, text->text.txt[it]);
+  I32 decode_at = 0;
+  for (;;) {
+    if (decode_at >= text->text.len) break;
+    Str decode_str = str_slice(text->text, decode_at, text->text.len - decode_at);
+
+    I32 advance = 0;
+    U32 codepoint = codepoint_from_utf8(decode_str, &advance);
+    if (!advance) {
+      advance = 1;
+    }
+
+    decode_at += advance;
+
+    FO_Glyph *g = fo_font_glyph_get(text->font, codepoint);
     draw_glyph_count += !g->no_texture;
   }
 
@@ -293,9 +305,21 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
   U32 packed_color = abgr_u32_from_rgba(text->color);
 
   V2F draw_at = text->pos;
-  For_U32(it, text->text.len) {
-    FO_Glyph *g = fo_font_glyph_get(text->font, text->text.txt[it]);
+  
+  decode_at = 0;
+  for (;;) {
+    if (decode_at >= text->text.len) break;
+    Str decode_str = str_slice(text->text, decode_at, text->text.len - decode_at);
 
+    I32 advance = 0;
+    U32 codepoint = codepoint_from_utf8(decode_str, &advance);
+    if (!advance) {
+      advance = 1;
+    }
+
+    decode_at += advance;
+
+    FO_Glyph *g = fo_font_glyph_get(text->font, codepoint);
     if (!g->no_texture) {
 
       V2F offset = v2f(g->pen_offset.x, g->pen_offset.y);

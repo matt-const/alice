@@ -26,8 +26,16 @@
 #include "ubuntu_regular.c"
 #include "font_awesome_7_solid.c"
 
+
+#define ICON_FA_PLAY  "\xef\x81\x8b"	// U+f04b
+#define ICON_FA_PAUSE "\xef\x81\x8c"	// U+f04c
+#define ICON_FA_FILE  "\xef\x85\x9b"	// U+f15b
+
+#define TEST_STR ICON_FA_PLAY " " ICON_FA_PAUSE " " ICON_FA_FILE
+
 var_global Arena   Permanent_Storage  = { };
-var_global FO_Font Font               = { };
+var_global FO_Font UI_Font            = { };
+var_global FO_Font ICO_Font           = { };
 
 fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {
@@ -35,14 +43,26 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     g2_init();
 
     Str ubuntu_font = str(Ubuntu_Regular_ttf_len, Ubuntu_Regular_ttf);
-    fo_font_init(&Font, &Permanent_Storage, ubuntu_font, 64, v2_u16(512, 512), Codepoints_ASCII);
+    fo_font_init(&UI_Font, &Permanent_Storage, ubuntu_font, 50, v2_u16(512, 512), Codepoints_ASCII);
+
+    Codepoint codepoints_ico[] = {
+      codepoint_from_utf8(str_lit(ICON_FA_PLAY), 0),
+      codepoint_from_utf8(str_lit(ICON_FA_PAUSE), 0),
+      codepoint_from_utf8(str_lit(ICON_FA_FILE), 0),
+      ' ',
+    };
+
+    Str font_awesome_font = str(Font_Awesome_7_Free_Solid_900_otf_len, Font_Awesome_7_Free_Solid_900_otf);
+    fo_font_init(&ICO_Font, &Permanent_Storage, font_awesome_font, 50, v2_u16(512, 512), array_from_sarray(Array_Codepoint, codepoints_ico));
   }
 
-  g2_draw_rect(v2f(0, 64), v2f(100000, 2), .color = v4f(.8f, .3f, .3f, 1));
-  g2_draw_rect(v2f(64, 0), v2f(2, 100000), .color = v4f(.2f, .8f, .3f, 1));
+  g2_draw_rect(v2f(-5000, platform_input()->mouse.position.y), v2f(10000, 2));
+  g2_draw_rect(v2f(platform_input()->mouse.position.x, -5000), v2f(2, 10000));
 
-  g2_draw_text(str_lit("The quick brown fox, jumps over the lazy dog... !"), &Font, v2f(64, 64));
-  g2_draw_text(str_lit("The quick brown fox, jumps over the lazy dog... !"), &Font, v2f(64, 64), .rot_deg = 90);
+  g2_draw_text(str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"), &UI_Font, platform_input()->mouse.position);
+  g2_draw_text(str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"), &UI_Font, platform_input()->mouse.position, .rot_deg = 90);
+
+  g2_draw_text(str_lit(TEST_STR), &ICO_Font, v2f_add(platform_input()->mouse.position, v2f(50, 50)));
 
   g2_frame_flush();
   r_frame_flush();

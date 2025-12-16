@@ -27,7 +27,7 @@ fn_internal U08 *r_command_push(R_Command_Type type, U64 bytes) {
     buffer_initialized = 1;
     arena_init(&R_Commands.arena);
   }
-
+  
   R_Command_Header *header = (R_Command_Header *)arena_push_size(&R_Commands.arena, bytes + sizeof(R_Command_Header));
   queue_push(R_Commands.first, R_Commands.last, header);
   return ((U08 *)header) + sizeof(R_Command_Header);

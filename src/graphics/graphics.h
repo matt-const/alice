@@ -29,7 +29,7 @@ fn_internal void g2_draw_tri_ext(G2_Tri *tri);
       .u3       = v2f(0.f, 1.f),              \
       .color    = v4f(1, 1, 1, 1),            \
       .tex      = R_Texture_White,            \
-      __VA_ARGS__,                            \
+      ##__VA_ARGS__,                          \
   })
 
 // NOTE(cmat): Rectangle
@@ -52,7 +52,7 @@ fn_internal void g2_draw_rect_ext(G2_Rect *rect);
       .uv_tr          = v2f(1, 1),            \
       .color          = v4f(1, 1, 1, 1),      \
       .tex            = R_Texture_White,      \
-      __VA_ARGS__,                            \
+      ##__VA_ARGS__,                          \
   })
 
 // NOTE(cmat): Rounded-Rectangle
@@ -76,7 +76,7 @@ fn_internal void g2_draw_rounded_rect_ext(G2_Rect_Rounded *rect);
       .uv_tr          = v2f(1, 1),                            \
       .color          = v4f(1, 1, 1, 1),                      \
       .tex            = R_Texture_White,                      \
-      __VA_ARGS__,                                            \
+      ##__VA_ARGS__,                                          \
   })
 
 // NOTE(cmat): Circle
@@ -95,7 +95,7 @@ fn_internal void g2_draw_disk_ext(G2_Disk *disk);
       .radius         = radius_,                              \
       .resolution     = 0,                                    \
       .color          = v4f(1, 1, 1, 1),                      \
-      __VA_ARGS__                                             \
+      ##__VA_ARGS__                                           \
   })
 
 // NOTE(cmat): Line
@@ -114,7 +114,7 @@ fn_internal void g2_draw_line_ext(G2_Line *line);
       .end   = end_,                                        \
       .thickness      = 2.f,                                \
       .color          = v4f(1.f, 1.f, 1.f, 1.f),            \
-      __VA_ARGS__                                           \
+      ##__VA_ARGS__                                         \
   });
 
 // NOTE(cmat): Text
@@ -135,6 +135,6 @@ fn_internal void g2_draw_text_ext(G2_Text *text);
       .pos     = pos_,                                    \
       .color   = v4f(1.f, 1.f, 1.f, 1.f),                 \
       .rot_deg = 0.f,                                     \
-      __VA_ARGS__                                         \
+      ##__VA_ARGS__                                       \
   });
 
