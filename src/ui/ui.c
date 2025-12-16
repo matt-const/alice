@@ -52,6 +52,8 @@ fn_internal UI_Node *ui_node_cache(Str key) {
         result->id  = UI_State.next_id++;
         result->key = key;
       }
+
+      entry = entry->next;
     }
   }
 

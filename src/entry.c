@@ -14,75 +14,35 @@
 #include "render/render_build.h"
 #include "render/render_build.c"
 
-#include "graphics/graphics_build.h"
-#include "graphics/graphics_build.c"
+#include "geometry/geometry_build.h"
+#include "geometry/geometry_build.c"
 
 #include "font/font_build.h"
 #include "font/font_build.c"
 
-#include "geometry/geometry_build.h"
-#include "geometry/geometry_build.c"
+#include "graphics/graphics_build.h"
+#include "graphics/graphics_build.c"
 
 #include "ubuntu_regular.c"
 #include "font_awesome_7_solid.c"
 
-R_Texture Glyph_Texture;
-V2_U16 atlas_size = { 512, 512 };
+var_global Arena   Permanent_Storage  = { };
+var_global FO_Font Font               = { };
 
 fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {
     r_init(render_context);
     g2_init();
 
-    STBTT_backend_init();
-
-    stbtt_fontinfo font = { };
-    if (!stbtt_InitFont(&font, Ubuntu_Regular_ttf, 0)) {
-      log_fatal("failed to load font");
-    }
-
-    I32 codepoint_start = ' ';
-    I32 codepoint_end   = '~';
-
-    Scratch scratch = { };
-    Scratch_Scope(&scratch, 0) {
-      U08 *texture_data = arena_push_count(scratch.arena, U08, 4 * atlas_size.x * atlas_size.y);
-      F32 scale         = stbtt_ScaleForPixelHeight(&font, 64);
-      
-      Skyline_Packer sk = { };
-      skyline_packer_init(&sk, scratch.arena, atlas_size);
-
-      For_I64_Range(it_glyph, codepoint_start, codepoint_end) {
-        I32 glyph_width  = 0;
-        I32 glyph_height = 0;
-        I32 glyph_x_off  = 0;
-        I32 glyph_y_off  = 0;
-        U08 *bitmap      = stbtt_GetCodepointBitmap(&font, 0, scale, it_glyph, &glyph_width, &glyph_height, &glyph_x_off, &glyph_y_off);
-
-        V2_U16 packed_position = { };
-        if (skyline_packer_push(&sk, v2_u16((U16)glyph_width, (U16)glyph_height), 1, &packed_position)) {
-          For_U64(it_h, glyph_height) {
-            For_U64(it_w, glyph_width) {
-              I64 dst_it = ((packed_position.y + it_h) * atlas_size.y + (packed_position.x + it_w));
-              I64 src_it = ((glyph_height - it_h - 1) * glyph_width + it_w);
-
-              texture_data[4 * dst_it + 0] = bitmap[src_it];
-              texture_data[4 * dst_it + 1] = bitmap[src_it];
-              texture_data[4 * dst_it + 2] = bitmap[src_it];
-              texture_data[4 * dst_it + 3] = bitmap[src_it];
-            }
-          }
-        }
-      }
-
-      Glyph_Texture = r_texture_allocate(R_Texture_Format_RGBA_U08_Normalized, atlas_size.x, atlas_size.y);
-      r_texture_download(Glyph_Texture, R_Texture_Format_RGBA_U08_Normalized, r2i(0, 0, atlas_size.x, atlas_size.y), texture_data);
-    }
-
-    STBTT_backend_free();
+    Str ubuntu_font = str(Ubuntu_Regular_ttf_len, Ubuntu_Regular_ttf);
+    fo_font_init(&Font, &Permanent_Storage, ubuntu_font, 64, v2_u16(512, 512), Codepoints_ASCII);
   }
 
-  g2_draw_rect(v2f(0.f, 0.f), v2f(atlas_size.x, atlas_size.y), .tex = Glyph_Texture);
+  g2_draw_rect(v2f(0, 64), v2f(100000, 2), .color = v4f(.8f, .3f, .3f, 1));
+  g2_draw_rect(v2f(64, 0), v2f(2, 100000), .color = v4f(.2f, .8f, .3f, 1));
+
+  g2_draw_text(str_lit("The quick brown fox, jumps over the lazy dog... !"), &Font, v2f(64, 64));
+  g2_draw_text(str_lit("The quick brown fox, jumps over the lazy dog... !"), &Font, v2f(64, 64), .rot_deg = 90);
 
   g2_frame_flush();
   r_frame_flush();

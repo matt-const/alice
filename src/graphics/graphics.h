@@ -117,29 +117,24 @@ fn_internal void g2_draw_line_ext(G2_Line *line);
       __VA_ARGS__                                           \
   });
 
-#if 0
-
 // NOTE(cmat): Text
 
 typedef struct G2_Text {
   Str      text;
   FO_Font *font;
   V2F      pos;
-  F32      height;
   V4F      color;
   F32      rot_deg;
 } G2_Text;
 
 fn_internal void g2_draw_text_ext(G2_Text *text);
-#define g2_draw_text(text_, font_, pos_, height_, ...)    \
+#define g2_draw_text(text_, font_, pos_, ...)    \
   g2_draw_text_ext(&(G2_Text) {                           \
       .text    = text_,                                   \
       .font    = font_,                                   \
       .pos     = pos_,                                    \
-      .height  = height_,                                 \
       .color   = v4f(1.f, 1.f, 1.f, 1.f),                 \
       .rot_deg = 0.f,                                     \
       __VA_ARGS__                                         \
   });
 
-#endif

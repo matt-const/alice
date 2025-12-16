@@ -253,7 +253,40 @@ typedef Array_Type(U64) Array_U64;
 typedef Array_Type(F32) Array_F32;
 typedef Array_Type(F64) Array_F64;
 
-typedef Array_Type(Str) Array_Str;
+typedef Array_Type(Codepoint) Array_Codepoint;
+typedef Array_Type(Str)       Array_Str;
+
+// ------------------------------------------------------------
+// #-- Hash Table
+#if 0
+
+typedef struct Bucket_Head {
+  struct Bucket_Head *next;
+  union {
+    void *key_ptr;
+    Str   key_str;
+    U64   key_u64;
+    I64   key_s64;
+  }
+} Bucket_Head;
+
+typedef struct Bucket_List {
+  Bucket_Node *first;
+  Bucket_Node *last;
+} Bucket_List;
+
+typedef struct Hash_Table {
+  U64          bucket_type_bytes;
+  U64          bucket_list_count;
+  Bucket_List *bucket_list_array;
+} Hash_Table;
+
+fn_internal void hash_table_init_ext(Hash_Table *ht, Arena *arena, U64 bucket_type_bytes, U64 bucket_count);
+
+fn_internal Bucket_Head *hash_table_add_key_u64_ext(Hash_Table *ht, Arena *arena, U64 key);
+fn_internal Bucket_Head *hash_table_add_key_str_ext(Hash_Table *ht, Arena *arena, Str key);
+
+#endif
 
 // ------------------------------------------------------------
 // #-- Logging

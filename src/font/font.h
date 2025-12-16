@@ -1,91 +1,42 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-typedef struct FO_Font {
-  R_Texture atlas;
+typedef struct FO_Glyph {
+  struct FO_Glyph  *hash_next;
 
-} FO_Font;
+  Codepoint codepoint;
+  B32       no_texture;
 
-#if 0
+  V2I       bounds;
+  R2F       atlas_uv;
+  V2I       pen_offset;
+  I32       pen_advance;
+} FO_Glyph;
 
-// TODO(cmat): Very basic, primitive, dumb font
-// implementation. Use freetype for desktop, stb for web.
-// TODO(cmat): Do NOT ship this.
-
-#include <stdio.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "thirdparty/stb_image.h"
-
-#pragma pack(push, 1)
-typedef struct FO_Font_Glyph {
-  U32 unicode;
-  F32 advance;
-  R2F glyph_bounds;
-  R2F atlas_bounds;
-} FO_Font_Glyph;
-#pragma pack(pop)
+typedef struct FO_Glyph_List {
+  FO_Glyph *first;
+  FO_Glyph *last;
+} FO_Glyph_List;
 
 typedef struct FO_Font {
-  V2I            atlas_dimension;
-  R_Texture      atlas_texture;
-  U32            glyph_count;
-  FO_Font_Glyph *glyph_array;
-  U32           *glyph_map;
-  U32           *ascii_range_from;
+  V2_U16         glyph_atlas_size;
+  R_Texture      glyph_atlas;
+  U64            glyph_bucket_count;
+  FO_Glyph_List *glyph_bucket_array;
 } FO_Font;
 
-inline fn_internal FO_Font font_load(Arena *arena, char *font_atlas, char *font_glyph_map) { 
-  FO_Font font;
-  zero_fill(&font);
+fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 font_size, V2_U16 atlas_size, Array_Codepoint codepoints);
 
-  // NOTE(cmat): Download font atlas.
-  // #--
-  stbi_set_flip_vertically_on_load(1);
-  U08 *atlas_data = stbi_load(font_atlas, &font.atlas_dimension.x, &font.atlas_dimension.y, 0, 4);
-  font.atlas_texture = r_texture_allocate(&(R_Texture_Config) {
-    .format = R_Texture_Format_RGBA_U08_Normalized,
-    .width  = font.atlas_dimension.x,
-    .height = font.atlas_dimension.y
-  });
+fn_internal FO_Glyph *fo_font_glyph_add(FO_Font *font, Arena *arena, Codepoint codepoint);
+fn_internal FO_Glyph *fo_font_glyph_get(FO_Font *font, Codepoint codepoint);
 
-  r_texture_download(&font.atlas_texture, atlas_data);
+U32 Codepoints_ASCII_Data[] = {
+  32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+  54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75,
+  76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97,
+  98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
+  116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126,
+};
 
-  // NOTE(cmat): Download glyph metadata.
-  // #--
-  FILE *in = fopen(font_glyph_map, "rb");
-  fseek(in, 0, SEEK_END);
-  U64 glyph_bytes = ftell(in);
-  fseek(in, 0, SEEK_SET);
-
-  fread(&font.glyph_count, sizeof(U32), 1, in);
-  font.glyph_array = (FO_Font_Glyph *)arena_push_count(arena, FO_Font_Glyph, font.glyph_count);
-  fread(font.glyph_array, sizeof(FO_Font_Glyph) * font.glyph_count, 1, in);
-  fclose(in);
-
-  For_U32(it, font.glyph_count) {
-    FO_Font_Glyph *g = font.glyph_array + it;
-    g->atlas_bounds.min.x /= font.atlas_dimension.x;
-    g->atlas_bounds.min.y /= font.atlas_dimension.y;
-    g->atlas_bounds.max.x /= font.atlas_dimension.x;
-    g->atlas_bounds.max.y /= font.atlas_dimension.y;
-  }
-  
-  font.ascii_range_from = 0;
-
-  return font;
-}
-
-inline fn_internal F32 font_text_width(FO_Font *font, Str string, F32 scale) {
-  F32 text_width = 0;
-  For_U32 (it, string.len) {
-    FO_Font_Glyph *g = &font->glyph_array[string.txt[it] - 32];
-    text_width += scale * g->advance;
-  }
-
-  return text_width;
-}
-
-
-
-#endif
+Assert_Compiler(sarray_len(Codepoints_ASCII_Data) == 127 - 32);
+Array_Codepoint Codepoints_ASCII = array_from_sarray(Array_Codepoint, Codepoints_ASCII_Data);

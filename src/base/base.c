@@ -289,6 +289,21 @@ fn_internal void scratch_init_for_thread(void) {
 }
 
 // ------------------------------------------------------------
+// #-- Hash Tables
+
+#if 0
+fn_internal void hash_table_init(Hash_Table *ht, Arena *arena, U64 bucket_type_bytes, U64 bucket_count) {
+  zero_fill(ht);
+  ht->bucket_type_bytes = bucket_type_bytes;
+  ht->bucket_list_count = bucket_count;
+  ht->bucket_list_array = arena_push_count(arena, Bucket_List, bucket_count);
+}
+
+fn_internal void hash_table_get_or_create()
+
+#endif
+
+// ------------------------------------------------------------
 // #-- Logging
 
 var_global Logger_State Logger = {

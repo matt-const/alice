@@ -19,7 +19,10 @@ const wasm_context = {
 
   shared_memory: {
     frame_state: null,
-  }
+  },
+
+  // TODO(cmat): Temporary.
+  webgpu_pass_encoder: null,
 };
 
 function js_string_from_c_string(string_len, string_txt) {
@@ -373,33 +376,21 @@ function js_webgpu_frame_flush(draw_command_ptr) {
     ]
   });
 
-  const command_encoder = wasm_context.webgpu.device.createCommandEncoder();
-
-  const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();
-  const render_pass_descriptor = {
-    colorAttachments: [{
-      view: backbuffer_texture_view,
-      clearValue: { r:0, g:0, b:0, a:1 },
-      loadOp: 'clear',
-      storeOp: 'store'
-    }]
-  };
-
-  const pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
+  // const pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
 
   // NOTE(cmat): Viewport.
-  pass_encoder.setViewport(draw_region_x0, draw_region_y0, draw_region_width, draw_region_height, 0.0, 1.0);
-  pass_encoder.setScissorRect(clip_region_x0, clip_region_y0, clip_region_width, clip_region_height);
+  wasm_context.webgpu_pass_encoder.setViewport(draw_region_x0, draw_region_y0, draw_region_width, draw_region_height, 0.0, 1.0);
+  wasm_context.webgpu_pass_encoder.setScissorRect(clip_region_x0, clip_region_y0, clip_region_width, clip_region_height);
 
-  pass_encoder.setPipeline(pipeline);
-  pass_encoder.setBindGroup(0, bind_group);
-  pass_encoder.setVertexBuffer(0, vertex_buffer);
-  pass_encoder.setIndexBuffer(index_buffer, "uint32");
-  pass_encoder.drawIndexed(draw_index_count, 1, draw_index_offset, 0, 0);
+  wasm_context.webgpu_pass_encoder.setPipeline(pipeline);
+  wasm_context.webgpu_pass_encoder.setBindGroup(0, bind_group);
+  wasm_context.webgpu_pass_encoder.setVertexBuffer(0, vertex_buffer);
+  wasm_context.webgpu_pass_encoder.setIndexBuffer(index_buffer, "uint32");
+  wasm_context.webgpu_pass_encoder.drawIndexed(draw_index_count, 1, draw_index_offset, 0, 0);
 
-  pass_encoder.end();
+  // pass_encoder.end();
 
-  wasm_context.webgpu.device.queue.submit([command_encoder.finish()]);
+  // wasm_context.webgpu.device.queue.submit([command_encoder.finish()]);
 }
 
 function wasm_pack_frame_state(frame_state) {
@@ -421,7 +412,23 @@ function wasm_pack_frame_state(frame_state) {
 function canvas_next_frame() {
 
   wasm_pack_frame_state(wasm_context.frame_state)
+
+  const command_encoder = wasm_context.webgpu.device.createCommandEncoder();
+
+  const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();
+  const render_pass_descriptor = {
+    colorAttachments: [{
+      view: backbuffer_texture_view,
+      clearValue: { r:0, g:0, b:0, a:1 },
+      loadOp: 'clear',
+      storeOp: 'store'
+    }]
+  };
+
+  wasm_context.webgpu_pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
   wasm_context.export_table.wasm_next_frame();
+  wasm_context.webgpu_pass_encoder.end();
+  wasm_context.webgpu.device.queue.submit([command_encoder.finish()]);
 
   requestAnimationFrame(canvas_next_frame);
 }

@@ -23,7 +23,6 @@ typedef struct G2_Buffer {
 typedef U32 G2_Draw_Mode;
 enum {
   G2_Draw_Mode_Flat,
-  //G2_Draw_Mode_MTSDF,
 
   G2_Draw_Mode_Count,
 };
@@ -269,17 +268,15 @@ fn_internal void g2_draw_line_ext(G2_Line *line) {
   entry.vertices[3] = (R_Vertex_XUC_2D) { .X = v2f_add(line->end,   normal_1), .C = packed_color, .U = v2f(0, 0), };
 }
 
-#if 0
-
-// TODO(cmat): This is all bad. Needs fixing.
 fn_internal void g2_draw_text_ext(G2_Text *text) {
   U32 draw_glyph_count = 0;
+
   For_U32(it, text->text.len) {
-    FO_Font_Glyph *g = &text->font->glyph_array[text->text.txt[it] - 32];
-    draw_glyph_count += (g->atlas_bounds.min.x != g->atlas_bounds.max.x);
+    FO_Glyph *g = fo_font_glyph_get(text->font, text->text.txt[it]);
+    draw_glyph_count += !g->no_texture;
   }
 
-  G2_Draw_Entry entry = g2_push_draw(4 * draw_glyph_count, 6 * draw_glyph_count, text->font->atlas_texture, G2_Draw_Mode_MTSDF);
+  G2_Draw_Entry entry = g2_push_draw(4 * draw_glyph_count, 6 * draw_glyph_count, text->font->glyph_atlas, G2_Draw_Mode_Flat);
   U32 index_at = 0;
   U32 vertex_at = 0;
   
@@ -297,19 +294,19 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
 
   V2F draw_at = text->pos;
   For_U32(it, text->text.len) {
-    FO_Font_Glyph *g = &text->font->glyph_array[text->text.txt[it] - 32];
-    if (g->atlas_bounds.min.x != g->atlas_bounds.max.x) {
-      V2F scaled_bounds_min  = v2f_mul(text->height, g->glyph_bounds.min);
-      V2F scaled_bounds_max  = v2f_mul(text->height, g->glyph_bounds.max);
+    FO_Glyph *g = fo_font_glyph_get(text->font, text->text.txt[it]);
+
+    if (!g->no_texture) {
+
+      V2F offset = v2f(g->pen_offset.x, g->pen_offset.y);
 
       V2F x_array[] = {
-        v2f_add(draw_at, scaled_bounds_min),
-        v2f_add(draw_at, v2f(scaled_bounds_max.x, scaled_bounds_min.y)),
-        v2f_add(draw_at, scaled_bounds_max),
-        v2f_add(draw_at, v2f(scaled_bounds_min.x, scaled_bounds_max.y)),
+        v2f_add(draw_at, offset),
+        v2f_add(draw_at, v2f(offset.x + g->bounds.x, offset.y)),
+        v2f_add(draw_at, v2f(offset.x + g->bounds.x, offset.y + g->bounds.y)),
+        v2f_add(draw_at, v2f(offset.x, offset.y + g->bounds.y)),
       };
 
-      // TODO(cmat): Quick implementation not optimal by any means.
       if (text->rot_deg > 0.f) {
         F32 angle_rad = f32_radians_from_degrees(text->rot_deg);
         F32 c = f32_cos(angle_rad);
@@ -322,10 +319,10 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
         }
       }
 
-      V2F U0 = g->atlas_bounds.min;
-      V2F U1 = v2f(g->atlas_bounds.max.x, g->atlas_bounds.min.y);
-      V2F U2 = g->atlas_bounds.max;
-      V2F U3 = v2f(g->atlas_bounds.min.x, g->atlas_bounds.max.y);
+      V2F U0 = g->atlas_uv.min;
+      V2F U1 = v2f(g->atlas_uv.max.x, g->atlas_uv.min.y);
+      V2F U2 = g->atlas_uv.max;
+      V2F U3 = v2f(g->atlas_uv.min.x, g->atlas_uv.max.y);
 
       entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[0], .C = packed_color, .U = U0, };
       entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[1], .C = packed_color, .U = U1, };
@@ -333,12 +330,9 @@ fn_internal void g2_draw_text_ext(G2_Text *text) {
       entry.vertices[vertex_at++] = (R_Vertex_XUC_2D) { .X = x_array[3], .C = packed_color, .U = U3, };
     }
 
-    draw_at.x += text->height * g->advance;
+    draw_at.x += g->pen_advance;
   }
 }
-
-#endif
-
 
 fn_internal void g2_clip_region(R2I region) {
   G2_State.active_clip_region = region;
