@@ -74,6 +74,7 @@ fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 fo
     font->metric_em       = f32_ceil(font_size);
     font->metric_ascent   = f32_ceil(scale * ascent);
     font->metric_descent  = -f32_ceil(-scale * descent);
+    font->metric_height   = font->metric_ascent - font->metric_descent;
     font->metric_line_gap = f32_ceil(scale * line_gap);
 
     Skyline_Packer sk = { };

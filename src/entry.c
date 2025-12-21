@@ -1,6 +1,14 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
+#include "ubuntu_regular.c"
+#include "font_awesome_7_solid.c"
+
+#define ICON_FA_PLAY  "\xef\x81\x8b"	// U+f04b
+#define ICON_FA_PAUSE "\xef\x81\x8c"	// U+f04c
+#define ICON_FA_FILE  "\xef\x85\x9b"	// U+f15b
+
+#define TEST_STR ICON_FA_PLAY " " ICON_FA_PAUSE " " ICON_FA_FILE
 
 #include "core/core_build.h"
 #include "core/core_build.c"
@@ -24,51 +32,103 @@
 #include "graphics/graphics_build.h"
 #include "graphics/graphics_build.c"
 
-#include "ubuntu_regular.c"
-#include "font_awesome_7_solid.c"
-
-
-#define ICON_FA_PLAY  "\xef\x81\x8b"	// U+f04b
-#define ICON_FA_PAUSE "\xef\x81\x8c"	// U+f04c
-#define ICON_FA_FILE  "\xef\x85\x9b"	// U+f15b
-
-#define TEST_STR ICON_FA_PLAY " " ICON_FA_PAUSE " " ICON_FA_FILE
+#include "ui/ui.h"
+#include "ui/ui.c"
 
 var_global Arena   Permanent_Storage  = { };
-var_global FO_Font UI_Font            = { };
-var_global FO_Font ICO_Font           = { };
 
 fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {
     r_init(render_context);
     g2_init();
-
-    Str ubuntu_font = str(Ubuntu_Regular_ttf_len, Ubuntu_Regular_ttf);
-    fo_font_init(&UI_Font, &Permanent_Storage, ubuntu_font, 50, v2_u16(512, 512), Codepoints_ASCII);
-
-    Codepoint codepoints_ico[] = {
-      codepoint_from_utf8(str_lit(ICON_FA_PLAY), 0),
-      codepoint_from_utf8(str_lit(ICON_FA_PAUSE), 0),
-      codepoint_from_utf8(str_lit(ICON_FA_FILE), 0),
-      ' ',
-    };
-
-    Str font_awesome_font = str(Font_Awesome_7_Free_Solid_900_otf_len, Font_Awesome_7_Free_Solid_900_otf);
-    fo_font_init(&ICO_Font, &Permanent_Storage, font_awesome_font, 50, v2_u16(512, 512), array_from_sarray(Array_Codepoint, codepoints_ico));
+    ui_init();
   }
 
-  g2_draw_rect(v2f(-5000, platform_input()->mouse.position.y), v2f(10000, 2));
-  g2_draw_rect(v2f(platform_input()->mouse.position.x, -5000), v2f(2, 10000));
-  F32 width = fo_text_width(&UI_Font, str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"));
-  V2F pos   = v2f_add(platform_input()->mouse.position, v2f(0, UI_Font.metric_descent));
-  
-  pos.x -= UI_Font.metric_em/4;
-  width += 2 * UI_Font.metric_em/4;
-  g2_draw_rect(pos, v2f(width, UI_Font.metric_ascent + -UI_Font.metric_descent), .color = v4f(.8f, .2f, .2f, 0.5f));
+  UI_Node *root = ui_node_push(str_lit("##root"), UI_Flag_Draw_Background);
+  root->layout.gap_child  = 2.0f;
+  root->layout.gap_border = 20;
+  root->layout.size[Axis2_X] = UI_Size_Fixed(platform_display()->resolution.x);
+  root->layout.size[Axis2_Y] = UI_Size_Fixed(platform_display()->resolution.y);
+  root->layout.direction = Axis2_Y;
 
-  g2_draw_text(str_lit("AVAV The quick brown fox, jumps over the lazy dog... !"), &UI_Font, platform_input()->mouse.position, .color = v4f(1, 1, 1, 1.0f));
+  root->draw.hsv_background = v3f(0.6f, .8f, .6f);
 
-  g2_draw_text(str_lit(TEST_STR), &ICO_Font, v2f_add(platform_input()->mouse.position, v2f(50, 50)));
+  ui_parent_push(root); {
+
+    UI_Node *fit = ui_node_push(str_lit("##fit"), UI_Flag_Draw_Background);
+    fit->layout.gap_child  = 2.0f;
+    fit->layout.gap_border = 20;
+    fit->layout.size[Axis2_X] = UI_Size_Fit;
+    fit->layout.size[Axis2_Y] = UI_Size_Fit;
+    fit->draw.hsv_background = v3f(0.1f, .9f, .8f);
+    fit->layout.direction = Axis2_Y;
+
+    ui_parent_push(fit); {
+
+      UI_Node *fit_1 = ui_node_push(str_lit("##fit_1"), UI_Flag_Draw_Background);
+      fit_1->layout.gap_child  = 2.0f;
+      fit_1->layout.gap_border = 20;
+      fit_1->layout.size[Axis2_X] = UI_Size_Fit;
+      fit_1->layout.size[Axis2_Y] = UI_Size_Fit;
+      fit_1->draw.hsv_background = v3f(0.3f, .9f, .8f);
+
+      ui_parent_push(fit_1); {
+
+        ui_button(str_lit("1, 1"));
+        ui_button(str_lit("1, 2"));
+        ui_button(str_lit("1, 3"));
+        ui_button(str_lit("1, 4"));
+        ui_button(str_lit("1, 5"));
+        ui_button(str_lit("1, 6"));
+        ui_button(str_lit("1, 7"));
+
+      } ui_parent_pop();
+
+      UI_Node *fit_2 = ui_node_push(str_lit("##fit_2"), UI_Flag_Draw_Background);
+      fit_2->layout.gap_child  = 2.0f;
+      fit_2->layout.gap_border = 20;
+      fit_2->layout.size[Axis2_X] = UI_Size_Fit;
+      fit_2->layout.size[Axis2_Y] = UI_Size_Fit;
+      fit_2->draw.hsv_background = v3f(0.3f, .9f, .8f);
+
+      ui_parent_push(fit_2); {
+
+        ui_button(str_lit("2, 1"));
+        ui_button(str_lit("2, 2"));
+        ui_button(str_lit("2, 3"));
+
+      } ui_parent_pop();
+
+      UI_Node *fit_3 = ui_node_push(str_lit("##fit_3"), UI_Flag_Draw_Background);
+      fit_3->layout.gap_child  = 2.0f;
+      fit_3->layout.gap_border = 20;
+      fit_3->layout.size[Axis2_X] = UI_Size_Fit;
+      fit_3->layout.size[Axis2_Y] = UI_Size_Fit;
+      fit_3->draw.hsv_background = v3f(0.3f, .9f, .8f);
+
+      ui_parent_push(fit_3); {
+
+        ui_button(str_lit("3, 1"));
+        ui_button(str_lit("3, 2"));
+        ui_button(str_lit("3, 3"));
+        ui_button(str_lit("3, 4"));
+        ui_button(str_lit("3, 5"));
+        ui_button(str_lit("3, 6"));
+        ui_button(str_lit("3, 7"));
+        ui_button(str_lit("3, 8"));
+
+      } ui_parent_pop();
+
+    } ui_parent_pop();
+
+
+  } ui_parent_pop();
+
+  ui_frame_flush(root);
+
+
+  g2_draw_rect(v2f(-5000, platform_input()->mouse.position.y), v2f(10000, 1), .color = v4f(1, 0, 0, 1));
+  g2_draw_rect(v2f(platform_input()->mouse.position.x, -5000), v2f(1, 10000), .color = v4f(0, 1, 0, 1));
 
   g2_frame_flush();
   r_frame_flush();

@@ -22,6 +22,7 @@ typedef struct FO_Font {
   I32            metric_em;
   I32            metric_ascent;
   I32            metric_descent;
+  I32            metric_height; // NOTE(cmat): ascent + (-descent)
   I32            metric_line_gap;
 
   V2_U16         glyph_atlas_size;

@@ -1026,6 +1026,8 @@ typedef U32 Axis2;
 enum {
   Axis2_X = 0,
   Axis2_Y = 1,
+
+  Axis2_Count = 2,
 };
 
 #pragma pack(push, 1)
@@ -1102,6 +1104,14 @@ force_inline fn_internal R3I r3i    (I32 x0, I32 y0, I32 z0, I32 x1, I32 y1, I32
 force_inline fn_internal R3F r3f    (F32 x0, F32 y0, F32 z0, F32 x1, F32 y1, F32 z1)  { return (R3F) { .x0 = x0, .y0 = y0, .z0 = z0, .x1 = x1, .y1 = y1, .z1 = z1, }; }
 force_inline fn_internal R3I r3i_v  (V3I min, V3I max)                                { return (R3I) { .min = min, .max = max };                                      }
 force_inline fn_internal R3F r3f_v  (V3F min, V3F max)                                { return (R3F) { .min = min, .max = max };                                      }
+
+inline fn_internal B32 r2i_contains_v2i(R2I region, V2I point) {
+  return (point.x >= region.x0) && (point.y >= region.y0) && (point.x <= region.x1) && (point.y <= region.y1);
+}
+
+inline fn_internal B32 r2f_contains_v2f(R2F region, V2F point) {
+  return (point.x >= region.x0) && (point.y >= region.y0) && (point.x <= region.x1) && (point.y <= region.y1);
+}
 
 // ------------------------------------------------------------
 // #-- Matrix Ops
