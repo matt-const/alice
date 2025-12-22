@@ -56,21 +56,21 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
   ui_parent_push(root); {
 
     UI_Node *fit = ui_node_push(str_lit("##fit"), UI_Flag_Draw_Background);
-    fit->layout.gap_child  = 2.0f;
-    fit->layout.gap_border = 20;
+    fit->layout.gap_child     = 2.0f;
+    fit->layout.gap_border    = 20;
     fit->layout.size[Axis2_X] = UI_Size_Fit;
-    fit->layout.size[Axis2_Y] = UI_Size_Fit;
-    fit->draw.hsv_background = v3f(0.1f, .9f, .8f);
-    fit->layout.direction = Axis2_Y;
+    fit->layout.size[Axis2_Y] = UI_Size_Fixed(platform_input()->mouse.position.y);
+    fit->draw.hsv_background  = v3f(0.1f, .9f, .8f);
+    fit->layout.direction     = Axis2_Y;
 
     ui_parent_push(fit); {
 
       UI_Node *fit_1 = ui_node_push(str_lit("##fit_1"), UI_Flag_Draw_Background);
-      fit_1->layout.gap_child  = 2.0f;
-      fit_1->layout.gap_border = 20;
+      fit_1->layout.gap_child     = 2.0f;
+      fit_1->layout.gap_border    = 20;
       fit_1->layout.size[Axis2_X] = UI_Size_Fit;
       fit_1->layout.size[Axis2_Y] = UI_Size_Fit;
-      fit_1->draw.hsv_background = v3f(0.3f, .9f, .8f);
+      fit_1->draw.hsv_background  = v3f(0.3f, .9f, .8f);
 
       ui_parent_push(fit_1); {
 
@@ -83,6 +83,14 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
         ui_button(str_lit("1, 7"));
 
       } ui_parent_pop();
+
+      UI_Node *fill_1 = ui_node_push(str_lit("##fill_1"), UI_Flag_Draw_Background);
+      fill_1->layout.gap_child  = 2.0f;
+      fill_1->layout.gap_border = 20;
+      fill_1->layout.size[Axis2_X] = UI_Size_Fill;
+      fill_1->layout.size[Axis2_Y] = UI_Size_Fill;
+      fill_1->draw.hsv_background = v3f(0.9f, .5f, .8f);
+      ui_parent_push(fill_1); { } ui_parent_pop();
 
       UI_Node *fit_2 = ui_node_push(str_lit("##fit_2"), UI_Flag_Draw_Background);
       fit_2->layout.gap_child  = 2.0f;
@@ -98,6 +106,15 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
         ui_button(str_lit("2, 3"));
 
       } ui_parent_pop();
+
+
+      UI_Node *fill_2 = ui_node_push(str_lit("##fill_2"), UI_Flag_Draw_Background);
+      fill_2->layout.gap_child  = 2.0f;
+      fill_2->layout.gap_border = 20;
+      fill_2->layout.size[Axis2_X] = UI_Size_Fill;
+      fill_2->layout.size[Axis2_Y] = UI_Size_Fill;
+      fill_2->draw.hsv_background = v3f(0.3f, .5f, .8f);
+      ui_parent_push(fill_2); { } ui_parent_pop();
 
       UI_Node *fit_3 = ui_node_push(str_lit("##fit_3"), UI_Flag_Draw_Background);
       fit_3->layout.gap_child  = 2.0f;
@@ -119,16 +136,11 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
 
       } ui_parent_pop();
 
+
     } ui_parent_pop();
-
-
   } ui_parent_pop();
 
   ui_frame_flush(root);
-
-
-  g2_draw_rect(v2f(-5000, platform_input()->mouse.position.y), v2f(10000, 1), .color = v4f(1, 0, 0, 1));
-  g2_draw_rect(v2f(platform_input()->mouse.position.x, -5000), v2f(1, 10000), .color = v4f(0, 1, 0, 1));
 
   g2_frame_flush();
   r_frame_flush();

@@ -1,4 +1,5 @@
-// Licensed under the MIT License (https://opensource.org/license/mit/)ui
+// (C) Copyright 2025 Matyas Constans
+// Licensed under the MIT License (https://opensource.org/license/mit/)
 
 var_global struct {
   Arena         arena;
@@ -99,21 +100,18 @@ fn_internal void ui_node_update_tree(UI_Node *node) {
 fn_internal void ui_node_update_response(UI_Node *node) {
   zero_fill(&node->response);
 
-#if 0
-  V2I mouse  = v2i(platform_input()->mouse.position.x, platform_input()->mouse.position.y);
-  R2I region = node->;
+  V2F mouse  = platform_input()->mouse.position;
+  R2F region = node->solved.region_absolute;
 
-  if (r2i_contains_v2i(region, mouse)) {
+  if (r2f_contains_v2f(region, mouse)) {
     if (node->flags & UI_Flag_Response_Hover) {
       node->response.hover = 1;
     }
   }
-#endif
 }
 
 fn_internal UI_Node *ui_node_push(Str key, UI_Flags flags) {
   UI_Node *node = ui_cache(key);
-  zero_fill(&node->solved);
 
   node->solved.label = node->key;
   node->flags        = flags;
@@ -155,55 +153,106 @@ fn_internal void ui_solve_layout_size_known(UI_Node *node) {
   ui_solve_layout_size_known_for_axis(node, Axis2_Y);
 }
 
-fn_internal void ui_solve_layout_size_child_dependent_for_axis(UI_Node *node, Axis2 axis) {
+fn_internal void ui_solve_layout_size_fit_for_axis(UI_Node *node, Axis2 axis) {
   if (node) {
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
-      ui_solve_layout_size_child_dependent_for_axis(it, axis);
+      ui_solve_layout_size_fit_for_axis(it, axis);
     }
 
     UI_Size size = node->layout.size[axis];
     switch (size.type) {
+      case UI_Size_Type_Fill:
       case UI_Size_Type_Fit: {
-        if (axis == node->layout.direction) {
+         
+          F32 used_space = 0;
+          if (node) {
+            if (axis == node->layout.direction) {
+              F32 children_sum    = 0;
+              I32 children_count  = 0;
 
-          // NOTE(cmat): Sum of children sizes.
-          F32 children_sum   = 0;
-          I32 children_count = 0;
+              for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
+                children_count += 1;
+                children_sum   += it->solved.size.dat[axis];
+              }
 
-          for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
-            children_count += 1;
-            children_sum   += it->solved.size.dat[axis];
+              used_space  = 2 * node->layout.gap_border;
+              used_space += children_sum;
+              if (children_count) {
+                used_space += (children_count - 1) * node->layout.gap_child;
+              }
+
+            } else {
+              // NOTE(cmat): Max of children sizes.
+              F32 children_max   = 0;
+              I32 children_count = 0;
+
+              for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
+                children_count += 1;
+                children_max   = f32_max(children_max, it->solved.size.dat[axis]);
+              }
+
+              used_space  = 2 * node->layout.gap_border;
+              used_space += children_max;
+            }
           }
 
-          node->solved.size.dat[axis]  = 2 * node->layout.gap_border;
-          node->solved.size.dat[axis] += children_sum;
-          if (children_count) {
-            node->solved.size.dat[axis] += (children_count - 1) * node->layout.gap_child;
-          }
-
-        } else {
-
-          // NOTE(cmat): Max of children sizes.
-          F32 children_max   = 0;
-          I32 children_count = 0;
- 
-          for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
-            children_count += 1;
-            children_max   = f32_max(children_max, it->solved.size.dat[axis]);
-          }
-
-          node->solved.size.dat[axis]  = 2 * node->layout.gap_border;
-          node->solved.size.dat[axis] += children_max;
-
-        }
+        node->solved.size.dat[axis] = used_space;
       } break;
     }
   }
 }
 
-fn_internal void ui_solve_layout_size_child_dependent(UI_Node *node) {
-  ui_solve_layout_size_child_dependent_for_axis(node, Axis2_X);
-  ui_solve_layout_size_child_dependent_for_axis(node, Axis2_Y);
+fn_internal void ui_solve_layout_size_fit(UI_Node *node) {
+  ui_solve_layout_size_fit_for_axis(node, Axis2_X);
+  ui_solve_layout_size_fit_for_axis(node, Axis2_Y);
+}
+
+fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F32 free_space) {
+  if (node) {
+    UI_Size size = node->layout.size[axis];
+    switch (size.type) {
+      case UI_Size_Type_Fill: {
+        node->solved.size.dat[axis] += free_space;
+      } break;
+    }
+
+
+    if (axis != node->layout.direction) {
+      for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {  
+        free_space = node->solved.size.dat[axis] - 2.f * it->solved.size.dat[axis];
+        ui_solve_layout_size_fill_for_axis(it, axis, free_space);
+      }
+    } else {
+      F32 free_space          = node->solved.size.dat[axis];
+      I32 children_count      = 0;
+      I32 fill_children_count = 0;
+
+      free_space -= 2.f * node->layout.gap_border;
+      for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
+        UI_Size it_size = it->layout.size[axis];
+
+        children_count += 1;
+        fill_children_count += it_size.type == UI_Size_Type_Fill;
+        free_space     -= it->solved.size.dat[axis];
+      }
+
+      if (children_count) {
+        free_space -= (node->layout.gap_child - 1) * children_count;
+      }
+
+      free_space *= f32_div_safe(1.f, fill_children_count);
+      free_space = f32_max(free_space, 0);
+      for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
+        ui_solve_layout_size_fill_for_axis(it, axis, free_space);
+      }
+
+    }
+  }
+}
+
+fn_internal void ui_solve_layout_size_fill(UI_Node *node, V2F free_space) {
+  ui_solve_layout_size_fill_for_axis(node, Axis2_X, free_space.x);
+  ui_solve_layout_size_fill_for_axis(node, Axis2_Y, free_space.y);
 }
 
 fn_internal F32 ui_solve_position_relative_for_axis(UI_Node *node, Axis2 axis, Axis2 layout_direction, I32 relative_position) {
@@ -261,7 +310,9 @@ fn_internal void ui_solve_region(UI_Node *node, V2F position_at) {
 
 fn_internal void ui_solve(UI_Node *node) {
   ui_solve_layout_size_known(node);
-  ui_solve_layout_size_child_dependent(node);
+  ui_solve_layout_size_fit(node);
+  ui_solve_layout_size_fill(node, v2f(0, 0));
+
   ui_solve_position_relative(node, Axis2_X, v2f(0, 0));
   ui_solve_region(node, v2f(0, 0));
 }
