@@ -22,8 +22,23 @@ fn_internal void ui_init(void) {
                26, v2_u16(1024, 1024), Codepoints_ASCII);
 }
 
-fn_internal UI_Node *ui_cache(Str node_key) {
-  U64 bucket_index   = str_hash(node_key) % UI_State.hash_count;
+fn_internal Str ui_label_from_key(UI_Key key) {
+  Str result = key.label;
+  return result;
+}
+
+fn_internal U64 ui_hash_from_key(UI_Key key) {
+  U64 hash = str_hash(key.label);
+
+  // TODO(cmat): replace by a proper hash function (FNVa-1)
+  hash += 13 * key.instance_id + 7;
+
+  return hash;
+}
+
+
+fn_internal UI_Node *ui_cache(UI_Key key) {
+  U64 bucket_index   = ui_hash_from_key(key) % UI_State.hash_count;
   UI_Node_List *list = UI_State.hash_array + bucket_index;
 
   UI_Node *result = 0;
@@ -32,12 +47,12 @@ fn_internal UI_Node *ui_cache(Str node_key) {
     list->last  = list->first;
 
     result      = list->last;
-    result->key = node_key;
+    result->key = key;
 
   } else {
     UI_Node *entry = list->first;
     while (entry) {
-      if (str_equals(node_key, entry->key)) {
+      if (str_equals(key.label, entry->key.label) && key.instance_id == entry->key.instance_id) {
         result = entry;
         break;
       }
@@ -46,7 +61,7 @@ fn_internal UI_Node *ui_cache(Str node_key) {
         list->last->hash_next  = arena_push_type(&UI_State.arena, UI_Node);
         list->last             = list->last->hash_next;
         result                 = list->last;
-        result->key            = node_key;
+        result->key            = key;
       }
 
       entry = entry->hash_next;
@@ -110,15 +125,10 @@ fn_internal void ui_node_update_response(UI_Node *node) {
   }
 }
 
-fn_internal Str ui_label_from_label_key(UI_Key key) {
-  Str result = key.label_key; 
-}
-
-fn_internal UI_Node *ui_node_push(Str key, UI_Flags flags) {
+fn_internal UI_Node *ui_node_push(Str label_key, UI_Flags flags) {
+  UI_Key key = (UI_Key) { .label = label_key, .instance_id = 0 };
   UI_Node *node = ui_cache(key);
-
-  node->solved.label = node->key.label_key;
-  node->flags        = flags;
+  node->flags   = flags;
 
   ui_node_update_response (node);
   ui_node_update_tree     (node);
@@ -312,6 +322,8 @@ fn_internal void ui_solve_region(UI_Node *node, V2F position_at) {
 }
 
 fn_internal void ui_solve(UI_Node *node) {
+  node->solved.label = ui_label_from_key(node->key);
+
   ui_solve_layout_size_known(node);
   ui_solve_layout_size_fit(node);
   ui_solve_layout_size_fill(node, v2f(0, 0));

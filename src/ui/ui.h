@@ -89,8 +89,8 @@ typedef struct UI_Node_Tree {
 } UI_Node_Tree;
 
 typedef struct UI_Key {
-  Str label_key;
-  U32 instance_id;
+  Str label;
+  U64 instance_id;
 } UI_Key;
 
 typedef struct UI_Node {
