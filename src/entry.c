@@ -35,7 +35,7 @@
 #include "ui/ui.h"
 #include "ui/ui.c"
 
-var_global Arena   Permanent_Storage  = { };
+var_global Arena Permanent_Storage  = { };
 
 fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {

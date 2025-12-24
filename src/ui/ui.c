@@ -110,10 +110,14 @@ fn_internal void ui_node_update_response(UI_Node *node) {
   }
 }
 
+fn_internal Str ui_label_from_label_key(UI_Key key) {
+  Str result = key.label_key; 
+}
+
 fn_internal UI_Node *ui_node_push(Str key, UI_Flags flags) {
   UI_Node *node = ui_cache(key);
 
-  node->solved.label = node->key;
+  node->solved.label = node->key.label_key;
   node->flags        = flags;
 
   ui_node_update_response (node);
@@ -215,7 +219,6 @@ fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F
         node->solved.size.dat[axis] += free_space;
       } break;
     }
-
 
     if (axis != node->layout.direction) {
       for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {  

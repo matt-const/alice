@@ -21,7 +21,7 @@ include_folders="-I${source_folder}"
 
 define_flags=""
 
-if [[ -v debug ]]; then
+if [[ -n ${debug-} ]]; then
 define_flags+=" -DBUILD_DEBUG=1 -DBUILD_ASSERT=1"
 else
 define_flags+=" -DBUILD_DEBUG=0 -DBUILD_ASSERT=0"
@@ -52,7 +52,7 @@ compiler_exec+="clang"
 # compiler_flags+=" -fsanitize-address-use-after-scope"
 # compiler_flags+=" -fno-omit-frame-pointer"
 
-if [[ -v debug ]]; then
+if [[ -n ${debug-} ]]; then
 compiler_flags+=" -O0"
 compiler_flags+=" -g"
 
