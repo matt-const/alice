@@ -6,20 +6,43 @@ var_global struct {
   U64           hash_count;
   UI_Node_List *hash_array;
   UI_Node      *active_parent;
-  FO_Font       font;
+
+  U32           font_stack_cap;
+  U32           font_stack_at; 
+  FO_Font     **font_stack;
 } UI_State = { };
 
-fn_internal void ui_init(void) {
+#define UI_Font_Scope(font_ptr_) Defer_Scope(ui_font_push(font_ptr_), ui_font_pop())
+
+fn_internal void ui_font_push(FO_Font *font) {
+  Assert(UI_State.font_stack_at < UI_State.font_stack_cap, "ui_font_push() exceeding stack size");
+  If_Likely (UI_State.font_stack_at < UI_State.font_stack_cap) {
+    UI_State.font_stack[++UI_State.font_stack_at] = font;
+  }
+}
+
+fn_internal void ui_font_pop(void) {
+  Assert(UI_State.font_stack_at > 0, "ui_font_pop() popping default font");
+  If_Likely (UI_State.font_stack_at > 0) {
+    UI_State.font_stack_at -= 1;
+  }
+}
+
+fn_internal FO_Font *ui_font_current(void) {
+  return UI_State.font_stack[UI_State.font_stack_at];
+}
+
+fn_internal void ui_init(FO_Font *font) {
   zero_fill(&UI_State);
 
   arena_init(&UI_State.arena);
   UI_State.hash_count = 1024;
   UI_State.hash_array = arena_push_count(&UI_State.arena, UI_Node_List, UI_State.hash_count);
 
-  fo_font_init(&UI_State.font,
-               &UI_State.arena,
-               str(Ubuntu_Regular_ttf_len, Ubuntu_Regular_ttf),
-               26, v2_u16(1024, 1024), Codepoints_ASCII);
+  UI_State.font_stack_cap = 32;
+  UI_State.font_stack_at  = 0;
+  UI_State.font_stack     = arena_push_count(&UI_State.arena, FO_Font *, UI_State.font_stack_cap);
+  UI_State.font_stack[0]  = font;
 }
 
 fn_internal Str ui_label_from_key(UI_Key key) {
@@ -27,18 +50,8 @@ fn_internal Str ui_label_from_key(UI_Key key) {
   return result;
 }
 
-fn_internal U64 ui_hash_from_key(UI_Key key) {
-  U64 hash = str_hash(key.label);
-
-  // TODO(cmat): replace by a proper hash function (FNVa-1)
-  hash += 13 * key.instance_id + 7;
-
-  return hash;
-}
-
-
 fn_internal UI_Node *ui_cache(UI_Key key) {
-  U64 bucket_index   = ui_hash_from_key(key) % UI_State.hash_count;
+  U64 bucket_index   = key.id % UI_State.hash_count;
   UI_Node_List *list = UI_State.hash_array + bucket_index;
 
   UI_Node *result = 0;
@@ -47,12 +60,14 @@ fn_internal UI_Node *ui_cache(UI_Key key) {
     list->last  = list->first;
 
     result      = list->last;
-    result->key = key;
+    result->key = (UI_Key) { .id = key.id, .label = arena_push_str(&UI_State.arena, key.label) };
+
+    log_info("Created UI element '%.*s' with id # %u", str_expand(result->key.label), result->key.id);
 
   } else {
     UI_Node *entry = list->first;
     while (entry) {
-      if (str_equals(key.label, entry->key.label) && key.instance_id == entry->key.instance_id) {
+      if (entry->key.id == key.id) {
         result = entry;
         break;
       }
@@ -61,7 +76,9 @@ fn_internal UI_Node *ui_cache(UI_Key key) {
         list->last->hash_next  = arena_push_type(&UI_State.arena, UI_Node);
         list->last             = list->last->hash_next;
         result                 = list->last;
-        result->key            = key;
+        result->key            = (UI_Key) { .id = key.id, .label = arena_push_str(&UI_State.arena, key.label) };
+
+        log_info("Created UI element '%.*s' with id # %u", str_expand(result->key.label), result->key.id);
       }
 
       entry = entry->hash_next;
@@ -122,22 +139,72 @@ fn_internal void ui_node_update_response(UI_Node *node) {
     if (node->flags & UI_Flag_Response_Hover) {
       node->response.hover = 1;
     }
+
+    if (platform_input()->mouse.left.down) {
+      if (platform_input()->mouse.left.down_first_frame) {
+        if (node->flags & UI_Flag_Response_Click) {
+          node->response.click = 1;
+        }
+      }
+
+      if (node->flags & UI_Flag_Response_Press) {
+        node->response.press = 1;
+      } 
+    }
   }
 }
 
-fn_internal UI_Node *ui_node_push(Str label_key, UI_Flags flags) {
-  UI_Key key = (UI_Key) { .label = label_key, .instance_id = 0 };
-  UI_Node *node = ui_cache(key);
-  node->flags   = flags;
+fn_internal void ui_node_update_animation(UI_Node *node) {
+  UI_Animation *anim = &node->animation;
 
-  ui_node_update_response (node);
-  ui_node_update_tree     (node);
+  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, .075f);
+  anim->press_t = f32_exp_smoothing(anim->press_t, node->response.press, .15f);
+}
+
+fn_internal UI_ID ui_node_id(Str label, UI_ID parent_id) {
+  UI_ID hash = 0;
+  Scratch scratch = { };
+  Scratch_Scope(&scratch, 0) {
+    U32  bytes = label.len + sizeof(UI_ID);
+    U08 *data  = arena_push_size(scratch.arena, bytes);
+
+    memory_copy(data, &parent_id, sizeof(UI_ID));
+    memory_copy(data + sizeof(UI_ID), label.txt, label.len);
+
+    hash = crc32(bytes, data);
+  }
+
+  return hash;
+}
+
+fn_internal UI_Node *ui_node_push(Str label, UI_Flags flags) {
+  UI_ID    parent_id = UI_State.active_parent ? UI_State.active_parent->key.id : 0;
+  UI_ID    id        = ui_node_id(label, parent_id);
+  UI_Key   key       = (UI_Key) { .id = id, .label = label };
+  UI_Node *node      = ui_cache(key);
+
+  node->flags     = flags;
+  node->draw.font = ui_font_current();
+
+  ui_node_update_response   (node);
+  ui_node_update_tree       (node);
+  ui_node_update_animation  (node);
 
   return node;
 }
 
 // ------------------------------------------------------------
 // #-- NOTE(cmat): Layout solver
+
+fn_internal void ui_solve_label(UI_Node *node) {
+  if (node) {
+    for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
+      ui_solve_label(it);
+    }
+
+    node->solved.label = ui_label_from_key(node->key);
+  }
+}
 
 fn_internal void ui_solve_layout_size_known_for_axis(UI_Node *node, Axis2 axis) {
   if (node) {
@@ -149,9 +216,9 @@ fn_internal void ui_solve_layout_size_known_for_axis(UI_Node *node, Axis2 axis) 
 
       case UI_Size_Type_Text: {
         if (axis == Axis2_X) {
-          node->solved.size.dat[axis] = fo_text_width(&UI_State.font, node->solved.label);
+          node->solved.size.dat[axis] = fo_text_width(node->draw.font, node->solved.label);
         } else {
-          node->solved.size.dat[axis] = UI_State.font.metric_height;
+          node->solved.size.dat[axis] = node->draw.font->metric_height;
         }
       } break;
     }
@@ -310,10 +377,10 @@ fn_internal void ui_solve_region(UI_Node *node, V2F position_at) {
   if (node) {
     position_at = v2f_add(position_at, node->solved.position_relative);
 
-    V2F display_resolution  = platform_display()->resolution;
-    V2F size                = node->solved.size;
-    V2F position_absolute   = v2f(position_at.x, display_resolution.y - position_at.y - node->solved.size.y);
-    node->solved.region_absolute = r2f_v(position_absolute,              v2f_add(position_absolute, size));
+    V2F display_resolution = platform_display()->resolution;
+    V2F size               = node->solved.size;
+    V2F position_absolute  = v2f(position_at.x, display_resolution.y - position_at.y - node->solved.size.y);
+    node->solved.region_absolute = r2f_v(position_absolute, v2f_add(position_absolute, size));
 
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
       ui_solve_region(it, position_at);
@@ -322,7 +389,7 @@ fn_internal void ui_solve_region(UI_Node *node, V2F position_at) {
 }
 
 fn_internal void ui_solve(UI_Node *node) {
-  node->solved.label = ui_label_from_key(node->key);
+  ui_solve_label(node);
 
   ui_solve_layout_size_known(node);
   ui_solve_layout_size_fit(node);
@@ -337,17 +404,23 @@ fn_internal void ui_solve(UI_Node *node) {
 
 fn_internal void ui_draw(UI_Node *node) {
   if (node) {
-    V4F color = { };
-    color.rgb = rgb_from_hsv(node->draw.hsv_background);
-    color.a   = 1.f;
 
-    R2F region = node->solved.region_absolute;
+    HSV hsv_color = node->palette.idle;
+
+    hsv_color = v3f_lerp(node->animation.hover_t, hsv_color, node->palette.hover);
+    hsv_color = v3f_lerp(node->animation.press_t, hsv_color, node->palette.press);
+
+    V4F rgb_color = { 0 };
+    rgb_color.rgb = rgb_from_hsv(hsv_color);
+    rgb_color.a   = 1.f;
+
+    R2F region   = node->solved.region_absolute;
     V2F position = region.min;
     V2F size     = v2f_sub(region.max, region.min);
 
-    g2_draw_rect(position, size, .color = color);
+    g2_draw_rect(position, size, .color = rgb_color);
     if (node->flags & UI_Flag_Draw_Label) {
-      g2_draw_text(node->solved.label, &UI_State.font, v2f_add(position, v2f(0, -UI_State.font.metric_descent)), .color = v4f(1, 1, 1, 1));
+      g2_draw_text(node->solved.label, node->draw.font, v2f_add(position, v2f(0, -node->draw.font->metric_descent)), .color = v4f(1, 1, 1, 1));
     }
 
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
@@ -356,11 +429,7 @@ fn_internal void ui_draw(UI_Node *node) {
   }
 }
 
-var_local_persist Random_Seed Random = 1234;
-
 fn_internal void ui_frame_flush(UI_Node *root_node) {
-  Random = 1234;
-
   ui_solve(root_node);
   ui_draw(root_node);
   Assert(UI_State.active_parent == 0, "mismatched ui_parent_push(), pop missing");
@@ -371,18 +440,20 @@ fn_internal void ui_frame_flush(UI_Node *root_node) {
 
 fn_internal UI_Response ui_button(Str key) {
   UI_Flags flags =
-    UI_Flag_Response_Hover        |
-    UI_Flag_Response_Press        |
-    UI_Flag_Response_Click        |
-    UI_Flag_Draw_Background       |
-    UI_Flag_Draw_Border           |
+    UI_Flag_Response_Hover   |
+    UI_Flag_Response_Press   |
+    UI_Flag_Response_Click   |
+    UI_Flag_Draw_Background  |
+    UI_Flag_Draw_Border      |
     UI_Flag_Draw_Label;
 
   UI_Node *node = ui_node_push(key, flags);
   node->layout.size[Axis2_X] = UI_Size_Text;
   node->layout.size[Axis2_Y] = UI_Size_Text;
 
-  node->draw.hsv_background = v3f(f32_random_unilateral(&Random), .8f, .6f);
+  node->palette.idle  = hsv_u32(235, 27, 22);
+  node->palette.hover = hsv_u32(235, 24, 44);
+  node->palette.press = hsv_u32(235, 24, 0);
 
   return node->response;
 }

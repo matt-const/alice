@@ -35,23 +35,41 @@
 #include "ui/ui.h"
 #include "ui/ui.c"
 
+var_global FO_Font UI_Font_Text     = { };
+var_global FO_Font UI_Font_Icon     = { };
 var_global Arena Permanent_Storage  = { };
 
 fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
   If_Unlikely(first_frame) {
     r_init(render_context);
     g2_init();
-    ui_init();
+
+    Codepoint icon_codepoints[] = {
+      codepoint_from_utf8(str_lit(ICON_FA_FILE), 0),
+      codepoint_from_utf8(str_lit(ICON_FA_PAUSE), 0),
+      codepoint_from_utf8(str_lit(ICON_FA_PLAY), 0),
+    };
+
+    fo_font_init(&UI_Font_Text, &Permanent_Storage,
+                 str(Ubuntu_Regular_ttf_len, Ubuntu_Regular_ttf),
+                 26, v2_u16(1024, 1024), Codepoints_ASCII);
+
+    fo_font_init(&UI_Font_Icon, &Permanent_Storage,
+                 str(Font_Awesome_7_Free_Solid_900_otf_len, Font_Awesome_7_Free_Solid_900_otf),
+                 26, v2_u16(1024, 1024), array_from_sarray(Array_Codepoint, icon_codepoints));
+
+
+    ui_init(&UI_Font_Text);
   }
 
   UI_Node *root = ui_node_push(str_lit("##root"), UI_Flag_Draw_Background);
-  root->layout.gap_child  = 2.0f;
-  root->layout.gap_border = 20;
-  root->layout.size[Axis2_X] = UI_Size_Fixed(platform_display()->resolution.x);
-  root->layout.size[Axis2_Y] = UI_Size_Fixed(platform_display()->resolution.y);
-  root->layout.direction = Axis2_Y;
+  root->layout.gap_child      = 2.0f;
+  root->layout.gap_border     = 20;
+  root->layout.size[Axis2_X]  = UI_Size_Fixed(platform_display()->resolution.x);
+  root->layout.size[Axis2_Y]  = UI_Size_Fixed(platform_display()->resolution.y);
+  root->layout.direction      = Axis2_Y;
 
-  root->draw.hsv_background = v3f(0.6f, .8f, .6f);
+  root->palette.idle = v3f(0.6f, .8f, .6f);
 
   ui_parent_push(root); {
 
@@ -59,8 +77,8 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     fit->layout.gap_child     = 2.0f;
     fit->layout.gap_border    = 20;
     fit->layout.size[Axis2_X] = UI_Size_Fit;
-    fit->layout.size[Axis2_Y] = UI_Size_Fixed(platform_input()->mouse.position.y);
-    fit->draw.hsv_background  = v3f(0.1f, .9f, .8f);
+    fit->layout.size[Axis2_Y] = UI_Size_Fixed(700);
+    fit->palette.idle         = v3f(0.1f, .9f, .8f);
     fit->layout.direction     = Axis2_Y;
 
     ui_parent_push(fit); {
@@ -70,17 +88,19 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       fit_1->layout.gap_border    = 20;
       fit_1->layout.size[Axis2_X] = UI_Size_Fit;
       fit_1->layout.size[Axis2_Y] = UI_Size_Fit;
-      fit_1->draw.hsv_background  = v3f(0.3f, .9f, .8f);
+      fit_1->palette.idle         = v3f(0.3f, .9f, .8f);
 
       ui_parent_push(fit_1); {
 
-        ui_button(str_lit("1, 1"));
-        ui_button(str_lit("1, 2"));
-        ui_button(str_lit("1, 3"));
-        ui_button(str_lit("1, 4"));
-        ui_button(str_lit("1, 5"));
-        ui_button(str_lit("1, 6"));
-        ui_button(str_lit("1, 7"));
+        ui_button(str_lit("Button 1"));
+        ui_button(str_lit("Button 2"));
+        ui_button(str_lit("Button 3"));
+        
+        UI_Font_Scope(&UI_Font_Icon) {
+          ui_button(str_lit(ICON_FA_FILE));
+          ui_button(str_lit(ICON_FA_PLAY));
+          ui_button(str_lit(ICON_FA_PAUSE));
+        }
 
       } ui_parent_pop();
 
@@ -89,7 +109,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       fill_1->layout.gap_border = 20;
       fill_1->layout.size[Axis2_X] = UI_Size_Fill;
       fill_1->layout.size[Axis2_Y] = UI_Size_Fill;
-      fill_1->draw.hsv_background = v3f(0.9f, .5f, .8f);
+      fill_1->palette.idle = v3f(0.9f, .5f, .8f);
       ui_parent_push(fill_1); { } ui_parent_pop();
 
       UI_Node *fit_2 = ui_node_push(str_lit("##fit_2"), UI_Flag_Draw_Background);
@@ -97,23 +117,23 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       fit_2->layout.gap_border = 20;
       fit_2->layout.size[Axis2_X] = UI_Size_Fit;
       fit_2->layout.size[Axis2_Y] = UI_Size_Fit;
-      fit_2->draw.hsv_background = v3f(0.3f, .9f, .8f);
+      fit_2->palette.idle = v3f(0.3f, .9f, .8f);
 
       ui_parent_push(fit_2); {
 
-        ui_button(str_lit("2, 1"));
-        ui_button(str_lit("2, 2"));
-        ui_button(str_lit("2, 3"));
+        ui_button(str_lit("Button 1"));
+        ui_button(str_lit("Button 2"));
+        ui_button(str_lit("Button 3"));
 
       } ui_parent_pop();
 
 
-      UI_Node *fill_2 = ui_node_push(str_lit("##fill_2"), UI_Flag_Draw_Background);
+      UI_Node *fill_2 = ui_node_push(str_lit("##fill_2"), UI_Flag_Draw_Background | UI_Flag_Response_Hover);
       fill_2->layout.gap_child  = 2.0f;
       fill_2->layout.gap_border = 20;
       fill_2->layout.size[Axis2_X] = UI_Size_Fill;
       fill_2->layout.size[Axis2_Y] = UI_Size_Fill;
-      fill_2->draw.hsv_background = v3f(0.3f, .5f, .8f);
+      fill_2->palette.idle = v3f(0.3f, .5f, .8f);
       ui_parent_push(fill_2); { } ui_parent_pop();
 
       UI_Node *fit_3 = ui_node_push(str_lit("##fit_3"), UI_Flag_Draw_Background);
@@ -121,7 +141,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       fit_3->layout.gap_border = 20;
       fit_3->layout.size[Axis2_X] = UI_Size_Fit;
       fit_3->layout.size[Axis2_Y] = UI_Size_Fit;
-      fit_3->draw.hsv_background = v3f(0.3f, .9f, .8f);
+      fit_3->palette.idle = v3f(0.3f, .9f, .8f);
 
       ui_parent_push(fit_3); {
 

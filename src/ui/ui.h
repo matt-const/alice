@@ -63,12 +63,21 @@ typedef struct UI_Layout {
   I32     float_position_y;
 } UI_Layout;
 
+typedef struct UI_Color_Palette {
+  HSV inactive;
+  HSV idle;
+  HSV hover;
+  HSV press;
+} UI_Color_Palette;
+
 typedef struct UI_Draw {
-  V3F hsv_background;
-  V3F hsv_idle;
-  V3F hsv_hover;
-  V4F hsv_press;
+  FO_Font *font;
 } UI_Draw;
+
+typedef struct UI_Animation {
+  F32 hover_t;
+  F32 press_t;
+} UI_Animation;
 
 // NOTE(cmat): Solved location, size.
 typedef struct UI_Solved {
@@ -88,20 +97,23 @@ typedef struct UI_Node_Tree {
   UI_Node *first_child;
 } UI_Node_Tree;
 
+typedef U32 UI_ID;
 typedef struct UI_Key {
-  Str label;
-  U64 instance_id;
+  UI_ID id;
+  Str   label;
 } UI_Key;
 
 typedef struct UI_Node {
-  UI_Key         key;
-  UI_Flags       flags;
-  UI_Node       *hash_next;
-  UI_Node_Tree   tree;
-  UI_Layout      layout;
-  UI_Draw        draw;
-  UI_Response    response;
-  UI_Solved      solved;
+  UI_Key            key;
+  UI_Flags          flags;
+  UI_Node          *hash_next;
+  UI_Node_Tree      tree;
+  UI_Layout         layout;
+  UI_Draw           draw;
+  UI_Color_Palette  palette;
+  UI_Animation      animation;
+  UI_Response       response;
+  UI_Solved         solved;
 } UI_Node;
 
 typedef struct UI_Node_List {

@@ -152,6 +152,15 @@ fn_internal void arena_clear    (Arena *arena);
 #define arena_push_type(arena, type, ...)           (type *)arena_push_size((arena), sizeof(type),  __VA_ARGS__)
 #define arena_push_count(arena, type, count, ...)   (type *)arena_push_size((arena), (count) * sizeof(type), __VA_ARGS__)
 
+inline fn_internal Str arena_push_str(Arena *arena, Str str) {
+  Str result = { };
+  result.len = str.len;
+  result.txt = arena_push_size(arena, str.len);
+  memory_copy(result.txt, str.txt, str.len);
+
+  return result;
+}
+
 typedef struct Arena_Temp {
   Arena       *arena;
   Arena_Chunk *rollback_chunk;
@@ -1401,6 +1410,12 @@ typedef HSV_F32 HSV;
 typedef RGBA_F32 RGBA;
 typedef HSVA_F32 HSVA;
 
+#define rbg_u32(r_, g_, b_) v3f((r_) / 255.f, (g_) / 255.f, (b_) / 255.f)
+#define hsv_u32(h_, s_, v_) v3f((h_) / 255.f, (s_) / 100.f, (v_) / 100.f)
+
+#define rbga_u32(r_, g_, b_, a_) v4f((r_) / 255.f, (g_) / 255.f, (b_) / 255.f, (a_) / 255.f)
+#define hsva_u32(h_, s_, v_, a_) v4f((h_) / 360.f, (s_) / 100.f, (v_) / 100.f, (a_) / 255.f)
+
 fn_internal RGB       rgb_from_hsv       (HSV rgb);
 fn_internal HSV       hsv_from_rgb       (RGB hsv);
 fn_internal RGBA      rgba_from_hsva     (HSVA rgb);
@@ -1414,10 +1429,12 @@ fn_internal RGBA_U32  abgr_u32_from_rgba_premul (RGBA_F32 rgba);
 // ------------------------------------------------------------
 // #-- Interpolation
 
-inline fn_internal F32 f32_lerp  (F32 t, F32 a, F32 b)  { return (1.f - t) * a + b;                    }
-inline fn_internal V2F v2f_lerp  (F32 t, V2F a, V2F b)  { return v2f_add(v2f_mul((1.f - t), a), b);    }
-inline fn_internal V3F v3f_lerp  (F32 t, V3F a, V3F b)  { return v3f_add(v3f_mul((1.f - t), a), b);    }
-inline fn_internal V4F v4f_lerp  (F32 t, V4F a, V4F b)  { return v4f_add(v4f_mul((1.f - t), a), b);    }
+inline fn_internal F32 f32_exp_smoothing(F32 x, F32 target, F32 rate) { return x + rate * (target - x); }
+
+inline fn_internal F32 f32_lerp  (F32 t, F32 a, F32 b)  { return (1.f - t) * a + t * b;                         }
+inline fn_internal V2F v2f_lerp  (F32 t, V2F a, V2F b)  { return v2f_add(v2f_mul((1.f - t), a), v2f_mul(t, b)); }
+inline fn_internal V3F v3f_lerp  (F32 t, V3F a, V3F b)  { return v3f_add(v3f_mul((1.f - t), a), v3f_mul(t, b)); }
+inline fn_internal V4F v4f_lerp  (F32 t, V4F a, V4F b)  { return v4f_add(v4f_mul((1.f - t), a), v4f_mul(t, b)); }
 
 #define rgb_lerp  v3f_lerp
 #define rgba_lerp v4f_lerp
@@ -1545,6 +1562,13 @@ force_inline fn_internal Mask_X04 f32_x04_mask_greater_than_or_equal  (F32_X04 l
 force_inline fn_internal F32_X04  f32_x04_blend                       (F32_X04 a, F32_X04 b, Mask_X04 mask)     { return (F32_X04)  { .simd = _mm_mask_blend_ps(mask.simd, a.simd, b.simd) }; }
 
 #endif
+
+// ------------------------------------------------------------
+// #-- CRC32
+
+fn_internal U32 crc32(U64 bytes, U08 *dat);
+
+force_inline fn_internal U32 str_crc32(Str str) { return crc32(str.len, str.txt); }
 
 // ------------------------------------------------------------
 // #-- Entry Point
