@@ -62,7 +62,7 @@ fn_internal UI_Node *ui_cache(UI_Key key) {
     result      = list->last;
     result->key = (UI_Key) { .id = key.id, .label = arena_push_str(&UI_State.arena, key.label) };
 
-    log_info("Created UI element '%.*s' with id # %u", str_expand(result->key.label), result->key.id);
+    log_debug("Created UI element '%.*s' with id # %u", str_expand(result->key.label), result->key.id);
 
   } else {
     UI_Node *entry = list->first;
@@ -78,7 +78,7 @@ fn_internal UI_Node *ui_cache(UI_Key key) {
         result                 = list->last;
         result->key            = (UI_Key) { .id = key.id, .label = arena_push_str(&UI_State.arena, key.label) };
 
-        log_info("Created UI element '%.*s' with id # %u", str_expand(result->key.label), result->key.id);
+        log_debug("(Hash-Collision) Created UI element '%.*s' with id # %u", str_expand(result->key.label), result->key.id);
       }
 
       entry = entry->hash_next;
@@ -87,6 +87,8 @@ fn_internal UI_Node *ui_cache(UI_Key key) {
 
   return result;
 }
+
+#define UI_Parent_Scope(node_) Defer_Scope(ui_parent_push(node_), ui_parent_pop())
 
 fn_internal void ui_parent_push(UI_Node *parent) {
   UI_State.active_parent = parent;
@@ -142,13 +144,13 @@ fn_internal void ui_node_update_response(UI_Node *node) {
 
     if (platform_input()->mouse.left.down) {
       if (platform_input()->mouse.left.down_first_frame) {
-        if (node->flags & UI_Flag_Response_Click) {
-          node->response.click = 1;
+        if (node->flags & UI_Flag_Response_Press) {
+          node->response.press = 1;
         }
       }
 
-      if (node->flags & UI_Flag_Response_Press) {
-        node->response.press = 1;
+      if (node->flags & UI_Flag_Response_Down) {
+        node->response.down = 1;
       } 
     }
   }
@@ -157,8 +159,10 @@ fn_internal void ui_node_update_response(UI_Node *node) {
 fn_internal void ui_node_update_animation(UI_Node *node) {
   UI_Animation *anim = &node->animation;
 
-  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, .075f);
-  anim->press_t = f32_exp_smoothing(anim->press_t, node->response.press, .15f);
+  F32 refresh_rate_coeff = platform_display()->frame_delta;
+
+  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, refresh_rate_coeff * 30.f);
+  anim->down_t  = f32_exp_smoothing(anim->down_t, node->response.down,   refresh_rate_coeff * 30.f);
 }
 
 fn_internal UI_ID ui_node_id(Str label, UI_ID parent_id) {
@@ -217,8 +221,10 @@ fn_internal void ui_solve_layout_size_known_for_axis(UI_Node *node, Axis2 axis) 
       case UI_Size_Type_Text: {
         if (axis == Axis2_X) {
           node->solved.size.dat[axis] = fo_text_width(node->draw.font, node->solved.label);
+          node->solved.size.dat[axis] += 2.f * node->layout.gap_border[Axis2_X];
         } else {
           node->solved.size.dat[axis] = node->draw.font->metric_height;
+          node->solved.size.dat[axis] += 2.f * node->layout.gap_border[Axis2_Y];
         }
       } break;
     }
@@ -256,7 +262,7 @@ fn_internal void ui_solve_layout_size_fit_for_axis(UI_Node *node, Axis2 axis) {
                 children_sum   += it->solved.size.dat[axis];
               }
 
-              used_space  = 2 * node->layout.gap_border;
+              used_space  = 2 * node->layout.gap_border[axis];
               used_space += children_sum;
               if (children_count) {
                 used_space += (children_count - 1) * node->layout.gap_child;
@@ -272,7 +278,7 @@ fn_internal void ui_solve_layout_size_fit_for_axis(UI_Node *node, Axis2 axis) {
                 children_max   = f32_max(children_max, it->solved.size.dat[axis]);
               }
 
-              used_space  = 2 * node->layout.gap_border;
+              used_space  = 2 * node->layout.gap_border[axis];
               used_space += children_max;
             }
           }
@@ -307,7 +313,7 @@ fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F
       I32 children_count      = 0;
       I32 fill_children_count = 0;
 
-      free_space -= 2.f * node->layout.gap_border;
+      free_space -= 2.f * node->layout.gap_border[axis];
       for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
         UI_Size it_size = it->layout.size[axis];
 
@@ -357,7 +363,7 @@ fn_internal F32 ui_solve_position_relative_for_axis(UI_Node *node, Axis2 axis, A
       relative_position += node->solved.size.dat[axis];
     }
 
-    I32 child_position = node->layout.gap_border;
+    I32 child_position = node->layout.gap_border[axis];
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
       child_position = ui_solve_position_relative_for_axis(it, axis, node->layout.direction, child_position);
       if (node->layout.direction == axis)
@@ -405,22 +411,31 @@ fn_internal void ui_solve(UI_Node *node) {
 fn_internal void ui_draw(UI_Node *node) {
   if (node) {
 
-    HSV hsv_color = node->palette.idle;
+    R2F region = node->solved.region_absolute;
+    if (node->flags & UI_Flag_Draw_Background) {
+      HSV hsv_color = node->palette.idle;
 
-    hsv_color = v3f_lerp(node->animation.hover_t, hsv_color, node->palette.hover);
-    hsv_color = v3f_lerp(node->animation.press_t, hsv_color, node->palette.press);
+      hsv_color = v3f_lerp(node->animation.hover_t, hsv_color, node->palette.hover);
+      hsv_color = v3f_lerp(node->animation.down_t,  hsv_color, node->palette.down);
 
-    V4F rgb_color = { 0 };
-    rgb_color.rgb = rgb_from_hsv(hsv_color);
-    rgb_color.a   = 1.f;
+      V4F rgb_color = { 0 };
+      rgb_color.rgb = rgb_from_hsv(hsv_color);
+      rgb_color.a   = 1.f;
 
-    R2F region   = node->solved.region_absolute;
-    V2F position = region.min;
-    V2F size     = v2f_sub(region.max, region.min);
+      V2F position = region.min;
+      V2F size     = v2f_sub(region.max, region.min);
 
-    g2_draw_rect(position, size, .color = rgb_color);
+      g2_draw_rect(position, size, .color = rgb_color);
+    }
+
     if (node->flags & UI_Flag_Draw_Label) {
-      g2_draw_text(node->solved.label, node->draw.font, v2f_add(position, v2f(0, -node->draw.font->metric_descent)), .color = v4f(1, 1, 1, 1));
+      V2F text_at = v2f_add(region.min, v2f(0, -node->draw.font->metric_descent));
+      text_at = v2f_add(text_at, v2f(node->layout.gap_border[Axis2_X], node->layout.gap_border[Axis2_Y]));
+
+      g2_draw_text(node->solved.label, node->draw.font, v2f_add(text_at, v2f(1, -1)), .color = v4f(0, 0, 0, .6f));
+
+      text_at = v2f_add(text_at, v2f_lerp(node->animation.down_t, v2f(0, 0), v2f(1.f, -1.f)));
+      g2_draw_text(node->solved.label, node->draw.font, text_at, .color = v4f(1, 1, 1, 1));
     }
 
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
@@ -437,24 +452,119 @@ fn_internal void ui_frame_flush(UI_Node *root_node) {
 
 // ------------------------------------------------------------
 // #-- NOTE(cmat): UI component definitions
+typedef U32 UI_Container_Mode;
+enum {
+  UI_Container_Mode_None, // NOTE(cmat): Invisible
+  UI_Container_Mode_Box,  // NOTE(cmat): A visible box.
+};
 
-fn_internal UI_Response ui_button(Str key) {
-  UI_Flags flags =
-    UI_Flag_Response_Hover   |
-    UI_Flag_Response_Press   |
-    UI_Flag_Response_Click   |
-    UI_Flag_Draw_Background  |
-    UI_Flag_Draw_Border      |
-    UI_Flag_Draw_Label;
 
-  UI_Node *node = ui_node_push(key, flags);
+fn_internal UI_Node *ui_container(Str label, UI_Container_Mode mode, Axis2 layout_direction, UI_Size size_x, UI_Size size_y) {
+  UI_Flags flags = 0;
+
+  switch (mode) {
+    case UI_Container_Mode_Box: {
+      flags = UI_Flag_Response_Hover  |
+              UI_Flag_Draw_Background |
+              UI_Flag_Draw_Border;
+    } break;
+  }
+
+  UI_Node *node = ui_node_push(label, flags);
+  node->layout.direction           = layout_direction;
+  node->layout.size[Axis2_X]       = size_x;
+  node->layout.size[Axis2_Y]       = size_y;
+  node->layout.gap_border[Axis2_X] = 4;
+  node->layout.gap_border[Axis2_Y] = 4;
+  node->layout.gap_child           = 2;
+
+  node->palette.idle  = hsv_u32(200, 10, 10);
+  node->palette.hover = hsv_u32(210, 10, 12);
+  node->palette.down  = hsv_u32(220, 10, 5);
+
+  return node;
+}
+
+fn_internal UI_Response ui_label(Str label) {
+  UI_Flags flags = UI_Flag_Draw_Label;
+
+  UI_Node *node = ui_node_push(label, flags);
   node->layout.size[Axis2_X] = UI_Size_Text;
   node->layout.size[Axis2_Y] = UI_Size_Text;
-
-  node->palette.idle  = hsv_u32(235, 27, 22);
-  node->palette.hover = hsv_u32(235, 24, 44);
-  node->palette.press = hsv_u32(235, 24, 0);
 
   return node->response;
 }
 
+fn_internal UI_Response ui_checkbox(Str label, B32 *value) {
+  UI_Response response = { };
+
+  UI_Node *container = ui_container(label, UI_Container_Mode_None, Axis2_X, UI_Size_Fit, UI_Size_Fit);
+  container->layout.gap_child = 5.0f;
+
+  UI_Parent_Scope(container) {
+    ui_label(label);
+
+    UI_Flags flags =
+      UI_Flag_Response_Hover   |
+      UI_Flag_Response_Down    |
+      UI_Flag_Response_Press   |
+      UI_Flag_Draw_Background  |
+      UI_Flag_Draw_Border;
+
+    UI_Node *node              = ui_node_push(str_lit("checkbox"), flags);
+    node->layout.size[Axis2_X] = UI_Size_Fixed(fo_em(node->draw.font, 1.f));
+    node->layout.size[Axis2_Y] = UI_Size_Fixed(fo_em(node->draw.font, 1.f));
+
+    node->palette.idle  = hsv_u32(235, 27, 25);
+    node->palette.hover = hsv_u32(235, 24, 44);
+    node->palette.down  = hsv_u32(235, 10, 15);
+
+    response = node->response;
+  }
+
+  return response;
+}
+
+fn_internal UI_Response ui_button(Str label) {
+  UI_Flags flags =
+    UI_Flag_Response_Hover   |
+    UI_Flag_Response_Down    |
+    UI_Flag_Response_Press   |
+    UI_Flag_Draw_Background  |
+    UI_Flag_Draw_Border      |
+    UI_Flag_Draw_Label;
+
+  UI_Node *node                    = ui_node_push(label, flags);
+  node->layout.size[Axis2_X]       = UI_Size_Text;
+  node->layout.size[Axis2_Y]       = UI_Size_Text;
+  node->layout.gap_border[Axis2_X] = fo_em(node->draw.font, .25f);
+  node->layout.gap_border[Axis2_Y] = fo_em(node->draw.font, .25f);
+
+  node->palette.idle  = hsv_u32(235, 27, 25);
+  node->palette.hover = hsv_u32(235, 24, 44);
+  node->palette.down  = hsv_u32(235, 10, 15);
+
+  return node->response;
+}
+
+fn_internal UI_Response ui_edit_f32(Str label, F32 *value, F32 step) {
+  UI_Flags flags =
+    UI_Flag_Response_Hover   |
+    UI_Flag_Response_Down    |
+    UI_Flag_Response_Press   |
+    UI_Flag_Draw_Background  |
+    UI_Flag_Draw_Border      |
+    UI_Flag_Draw_Label;
+
+  UI_Node *node = ui_node_push(label, flags);
+  node->layout.size[Axis2_X] = UI_Size_Text;
+  node->layout.size[Axis2_Y] = UI_Size_Text;
+  node->layout.gap_border[Axis2_X] = .25f * node->draw.font->metric_em;
+  node->layout.gap_border[Axis2_Y] = .25f * node->draw.font->metric_em;
+
+  node->palette.idle  = hsv_u32(235, 27, 25);
+  node->palette.hover = hsv_u32(235, 24, 44);
+  node->palette.down  = hsv_u32(235, 10, 15);
+
+  return node->response;
+}

@@ -12,27 +12,31 @@ enum {
 
   // NOTE(cmat): Action Response
   UI_Flag_Response_Hover        = 1 << 0,
-  UI_Flag_Response_Press        = 1 << 1,
-  UI_Flag_Response_Click        = 1 << 2,
+  UI_Flag_Response_Down         = 1 << 1,
+
+  UI_Flag_Response_Press        = 1 << 2, // NOTE(cmat): A press triggers ONCE, after a mouse click.
+  UI_Flag_Response_Release      = 1 << 3, // NOTE(cmat): A release triggers ONCE, after the mouse is released.
 
   // NOTE(cmat): Layout
-  UI_Flag_Layout_Float_X        = 1 << 3,
-  UI_Flag_Layout_Float_Y        = 1 << 4,
+  UI_Flag_Layout_Float_X        = 1 << 4,
+  UI_Flag_Layout_Float_Y        = 1 << 5,
 
   // NOTE(cmat): Draw flags
-  UI_Flag_Draw_Background       = 1 << 5,
-  UI_Flag_Draw_Shadow           = 1 << 6,
-  UI_Flag_Draw_Rounded          = 1 << 7,
-  UI_Flag_Draw_Border           = 1 << 8,
-  UI_Flag_Draw_Label            = 1 << 9,
-  UI_Flag_Draw_Clip_Content     = 1 << 10,
-  UI_Flag_Draw_Content_Hook     = 1 << 11,
+  UI_Flag_Draw_Background       = 1 << 6,
+  UI_Flag_Draw_Shadow           = 1 << 7,
+  UI_Flag_Draw_Rounded          = 1 << 8,
+  UI_Flag_Draw_Border           = 1 << 9,
+  UI_Flag_Draw_Label            = 1 << 10,
+  UI_Flag_Draw_Clip_Content     = 1 << 11,
+  UI_Flag_Draw_Content_Hook     = 1 << 12,
 };
 
 typedef struct UI_Response {
   B32 hover;
+  B32 down;
+
   B32 press;
-  B32 click;
+  B32 release;
 } UI_Response;
 
 typedef U32 UI_Size_Type;
@@ -55,8 +59,8 @@ typedef struct UI_Size {
 
 typedef struct UI_Layout {
   Axis2   direction;
-  UI_Size size[Axis2_Count];
-  I32     gap_border;
+  UI_Size size        [Axis2_Count];
+  I32     gap_border  [Axis2_Count];
   I32     gap_child;
 
   I32     float_position_x;
@@ -67,7 +71,7 @@ typedef struct UI_Color_Palette {
   HSV inactive;
   HSV idle;
   HSV hover;
-  HSV press;
+  HSV down;
 } UI_Color_Palette;
 
 typedef struct UI_Draw {
@@ -76,7 +80,7 @@ typedef struct UI_Draw {
 
 typedef struct UI_Animation {
   F32 hover_t;
-  F32 press_t;
+  F32 down_t;
 } UI_Animation;
 
 // NOTE(cmat): Solved location, size.

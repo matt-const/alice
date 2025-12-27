@@ -1,6 +1,7 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
+
 typedef struct FO_Glyph {
   struct FO_Glyph  *hash_next;
 
@@ -35,8 +36,16 @@ fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 fo
 
 fn_internal FO_Glyph *fo_glyph_add(FO_Font *font, Arena *arena, Codepoint codepoint);
 fn_internal FO_Glyph *fo_glyph_get(FO_Font *font, Codepoint codepoint);
-
 fn_internal F32       fo_text_width(FO_Font *font, Str text);
+
+inline fn_internal F32 fo_em(FO_Font *font, F32 em) {
+  F32 result = 0;
+  if (font) {
+    result = font->metric_em * em;
+  }
+
+  return result;
+}
 
 var_global U32 Codepoints_ASCII_Data[] = {
   32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,

@@ -63,6 +63,7 @@ fn_internal void wasm_update_input(Platform_Input *input) {
 fn_internal void wasm_update_frame_state(Platform_Frame_State *state) {
   state->display.frame_index += 1;
   state->display.resolution   = v2f(WASM_Shared_Frame_State.display_resolution_width, WASM_Shared_Frame_State.display_resolution_height);
+  state->display.frame_delta  = 1.f / 200.f;
 
   wasm_update_input(&state->input);
 }
