@@ -75,8 +75,8 @@ typedef struct {
 } Arena_Push;
 
 enum {
-  Arena_Default_Align = sizeof(void*),
-  Arena_Default_Flags = Arena_Push_Flag_Zero_Init,
+  Arena_Alignment_Default = sizeof(void*),
+  Arena_Push_Flags_Default = Arena_Push_Flag_Zero_Init,
 };
 
 var_global U64 arena_chunk_magic = u64_pack('A','R','E','N','A','C','H','K');
@@ -148,7 +148,7 @@ fn_internal U08 *arena_push_ext (Arena *arena, U64 bytes, Arena_Push *push);
 fn_internal void arena_clear    (Arena *arena);
 
 #define arena_init(arena, ...)                      arena_init_ext((arena), &(Arena_Init) { .flags = Arena_Flag_Defaults, .reserve_initial = 0, __VA_ARGS__ })
-#define arena_push_size(arena, bytes, ...)          arena_push_ext((arena), (bytes), &(Arena_Push) { .align = Arena_Default_Align, .flags = Arena_Default_Flags, __VA_ARGS__ })
+#define arena_push_size(arena, bytes, ...)          arena_push_ext((arena), (bytes), &(Arena_Push) { .align = Arena_Alignment_Default, .flags = Arena_Push_Flags_Default, __VA_ARGS__ })
 #define arena_push_type(arena, type, ...)           (type *)arena_push_size((arena), sizeof(type),  __VA_ARGS__)
 #define arena_push_count(arena, type, count, ...)   (type *)arena_push_size((arena), (count) * sizeof(type), __VA_ARGS__)
 

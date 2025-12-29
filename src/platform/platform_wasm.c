@@ -11,6 +11,7 @@ fn_external void js_platform_set_shared_memory(U32 frame_state);
 var_global struct {
   U32 display_resolution_width;
   U32 display_resolution_height;
+  F32 display_frame_delta;
 
   U32 mouse_position_x;
   U32 mouse_position_y;
@@ -62,8 +63,8 @@ fn_internal void wasm_update_input(Platform_Input *input) {
 
 fn_internal void wasm_update_frame_state(Platform_Frame_State *state) {
   state->display.frame_index += 1;
+  state->display.frame_delta  = WASM_Shared_Frame_State.display_frame_delta;
   state->display.resolution   = v2f(WASM_Shared_Frame_State.display_resolution_width, WASM_Shared_Frame_State.display_resolution_height);
-  state->display.frame_delta  = 1.f / 200.f;
 
   wasm_update_input(&state->input);
 }

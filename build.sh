@@ -98,6 +98,7 @@ source_files+=" ${source_folder}/thirdparty/walloc.c"
 # Invoke compiler
 pushd build > /dev/null 2>&1
 
+echo "compiler flags: ${compiler_flags}"
 $compiler_exec $source_files $define_flags $include_folders $compiler_flags $linker_flags
 
 popd > /dev/null 2>&1

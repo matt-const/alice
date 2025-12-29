@@ -6,6 +6,8 @@
 // - Ryan J. Fleury's articles:             https://www.rfleury.com/p/ui-part-2-build-it-every-frame-immediate
 // - Clay UI layout:                        https://www.youtube.com/watch?v=by9lQvpvMIc
 
+#define UI_Root_Label str_lit("##root")
+
 typedef U32 UI_Flags;
 enum {
   UI_Flag_None                  = 0,
@@ -25,16 +27,16 @@ enum {
   UI_Flag_Draw_Background       = 1 << 6,
   UI_Flag_Draw_Shadow           = 1 << 7,
   UI_Flag_Draw_Rounded          = 1 << 8,
-  UI_Flag_Draw_Border           = 1 << 9,
-  UI_Flag_Draw_Label            = 1 << 10,
-  UI_Flag_Draw_Clip_Content     = 1 << 11,
-  UI_Flag_Draw_Content_Hook     = 1 << 12,
+  UI_Flag_Draw_Label            = 1 << 9,
+  UI_Flag_Draw_Clip_Content     = 1 << 10,
+  UI_Flag_Draw_Content_Hook     = 1 << 11,
+  UI_Flag_Draw_Border           = 1 << 12,
+  UI_Flag_Draw_Inner_Fill       = 1 << 13,
 };
 
 typedef struct UI_Response {
   B32 hover;
   B32 down;
-
   B32 press;
   B32 release;
 } UI_Response;
@@ -63,8 +65,7 @@ typedef struct UI_Layout {
   I32     gap_border  [Axis2_Count];
   I32     gap_child;
 
-  I32     float_position_x;
-  I32     float_position_y;
+  I32     float_position[Axis2_Count];
 } UI_Layout;
 
 typedef struct UI_Color_Palette {
@@ -72,10 +73,13 @@ typedef struct UI_Color_Palette {
   HSV idle;
   HSV hover;
   HSV down;
+
+  HSV inner_fill;
 } UI_Color_Palette;
 
 typedef struct UI_Draw {
   FO_Font *font;
+  I32      inner_fill_border;
 } UI_Draw;
 
 typedef struct UI_Animation {
@@ -108,9 +112,11 @@ typedef struct UI_Key {
 } UI_Key;
 
 typedef struct UI_Node {
+  UI_Node          *hash_next;
+  UI_Node          *overlay_next;
+
   UI_Key            key;
   UI_Flags          flags;
-  UI_Node          *hash_next;
   UI_Node_Tree      tree;
   UI_Layout         layout;
   UI_Draw           draw;
@@ -125,3 +131,4 @@ typedef struct UI_Node_List {
   UI_Node *last;
 } UI_Node_List;
 
+typedef Array_Type(UI_Node) UI_Node_Array;

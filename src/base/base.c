@@ -53,7 +53,7 @@ fn_internal void arena_chunk_deallocate(Arena_Chunk *chunk) {
 
   core_memory_uncommit(chunk->base_memory, chunk->next_page - chunk->base_memory);
   
-  Arena_Push header_alloc = { .align = Arena_Default_Align, .flags = 0 };
+  Arena_Push header_alloc = { .align = Arena_Alignment_Default, .flags = 0 };
   Arena_Chunk *new_header = (Arena_Chunk *)arena_chunk_allocate(&chunk_header, sizeof(Arena_Chunk), &header_alloc);
   memory_copy(new_header, &chunk_header, sizeof(Arena_Chunk)); 
 }
@@ -79,7 +79,7 @@ fn_internal Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) 
   chunk.next        = 0;
   
   // NOTE(cmat): Push chunk header first.
-  Arena_Push header_alloc = { .align = Arena_Default_Align, .flags = 0 };
+  Arena_Push header_alloc = { .align = Arena_Alignment_Default, .flags = 0 };
   Arena_Chunk *header = (Arena_Chunk *)arena_chunk_allocate(&chunk, sizeof(chunk), &header_alloc);
   memory_copy(header, &chunk, sizeof(Arena_Chunk));
 

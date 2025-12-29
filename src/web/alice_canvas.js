@@ -1,11 +1,13 @@
 const wasm_context = {
-  canvas:         null,
-  memory:         null,
-  export_table:   null,
-  webgpu:         null,
+  canvas:           null,
+  memory:           null,
+  export_table:     null,
+  webgpu:           null,
+  frame_time_last:  null,
 
   frame_state: {
     display: {
+      frame_delta: 0,
       resolution: { width: 0, height: 0 },
     },
 
@@ -394,25 +396,29 @@ function js_webgpu_frame_flush(draw_command_ptr) {
 }
 
 function wasm_pack_frame_state(frame_state) {
-  const buffer_view = new DataView(wasm_context.memory.buffer, wasm_context.shared_memory.frame_state, 28);
+  const buffer_view = new DataView(wasm_context.memory.buffer, wasm_context.shared_memory.frame_state, 8 * 4);
   
   let offset = 0;
-  buffer_view.setUint32 (offset, frame_state.display.resolution.width,  true); offset += 4;
-  buffer_view.setUint32 (offset, frame_state.display.resolution.height, true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.display.resolution.width,  true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.display.resolution.height, true); offset += 4;
+  buffer_view.setFloat32  (offset, frame_state.display.frame_delta,       true); offset += 4;
 
-  buffer_view.setUint32 (offset, frame_state.input.mouse.position.x,    true); offset += 4;
-  buffer_view.setUint32 (offset, frame_state.input.mouse.position.y,    true); offset += 4;
-  buffer_view.setUint32 (offset, frame_state.input.mouse.button.left,   true); offset += 4;
-  buffer_view.setUint32 (offset, frame_state.input.mouse.button.right,  true); offset += 4;
-  buffer_view.setUint32 (offset, frame_state.input.mouse.button.middle, true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.input.mouse.position.x,    true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.input.mouse.position.y,    true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.input.mouse.button.left,   true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.input.mouse.button.right,  true); offset += 4;
+  buffer_view.setUint32   (offset, frame_state.input.mouse.button.middle, true); offset += 4;
 
   return buffer_view;
 }
 
 function canvas_next_frame() {
 
-  wasm_pack_frame_state(wasm_context.frame_state)
+  frametime_now                                 = performance.now();
+  wasm_context.frame_state.display.frame_delta  = 0.001 * (frametime_now - wasm_context.frame_time_last);
+  wasm_context.frame_time_last                  = frametime_now;
 
+  wasm_pack_frame_state(wasm_context.frame_state)
   const command_encoder = wasm_context.webgpu.device.createCommandEncoder();
 
   const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();
@@ -536,6 +542,7 @@ function wasm_module_load(wasm_bytecode) {
       wasm_context.export_table.wasm_entry_point(cpu_logical_cores);
 
       // NOTE(cmat): Start animation frame requests
+      wasm_context.frame_time_last = performance.now();
       canvas_next_frame();
     });
   });
