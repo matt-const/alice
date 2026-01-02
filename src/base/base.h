@@ -1152,14 +1152,25 @@ inline fn_internal M4F m4f_id(void) {
   return result;
 }
 
+inline fn_internal M4F m4f_diag(V4F diag) {
+  M4F result;
+  zero_fill(&result);
+  result.e11 = diag.dat[0];
+  result.e22 = diag.dat[1];
+  result.e33 = diag.dat[2];
+  result.e44 = diag.dat[3];
+  return result;
+}
+
+
 M2F m2f_mul(M2F lhs, M2F rhs) {
   M2F result;
   zero_fill(&result);
 
   For_U32(row, 2) {
     For_U32(col, 2) {
-      result.ele[row][col] = lhs.ele[row][0] * rhs.ele[0][col] +
-                             lhs.ele[row][1] * rhs.ele[1][col];
+      result.ele[row][col] = rhs.ele[row][0] * lhs.ele[0][col] +
+                             rhs.ele[row][1] * lhs.ele[1][col];
     }
   }
 
@@ -1172,9 +1183,9 @@ M3F m3f_mul(M3F lhs, M3F rhs) {
 
   For_U32(row, 3) {
     For_U32(col, 3) {
-      result.ele[row][col] = lhs.ele[row][0] * rhs.ele[0][col] +
-                             lhs.ele[row][1] * rhs.ele[1][col] +
-                             lhs.ele[row][2] * rhs.ele[2][col];
+      result.ele[row][col] = rhs.ele[row][0] * lhs.ele[0][col] +
+                             rhs.ele[row][1] * lhs.ele[1][col] +
+                             rhs.ele[row][2] * lhs.ele[2][col];
     }
   }
 
@@ -1187,25 +1198,25 @@ M4F m4f_mul(M4F lhs, M4F rhs) {
 
   For_U32(row, 4) {
     For_U32(col, 4) {
-      result.ele[row][col] = lhs.ele[row][0] * rhs.ele[0][col] +
-                             lhs.ele[row][1] * rhs.ele[1][col] +
-                             lhs.ele[row][2] * rhs.ele[2][col] +
-                             lhs.ele[row][3] * rhs.ele[3][col];
+      result.ele[row][col] = rhs.ele[row][0] * lhs.ele[0][col] +
+                             rhs.ele[row][1] * lhs.ele[1][col] +
+                             rhs.ele[row][2] * lhs.ele[2][col] +
+                             rhs.ele[row][3] * lhs.ele[3][col];
     }
   }
 
   return result;
 }
 
-V4F m4f_mul_v4f(M4F lhs, V4F rhs) {
+V4F m4f_mul_v4f(V4F lhs, M4F rhs) {
   V4F result;
   zero_fill(&result);
 
   For_U32(row, 4) {
-    result.dat[row] = lhs.ele[row][0] * rhs.dat[0] +
-                      lhs.ele[row][1] * rhs.dat[1] +
-                      lhs.ele[row][2] * rhs.dat[2] +
-                      lhs.ele[row][3] * rhs.dat[3];
+    result.dat[row] = rhs.ele[row][0] * lhs.dat[0] +
+                      rhs.ele[row][1] * lhs.dat[1] +
+                      rhs.ele[row][2] * lhs.dat[2] +
+                      rhs.ele[row][3] * lhs.dat[3];
   }
 
   return result;
@@ -1393,6 +1404,64 @@ fn_internal F32 m2f_det(M2F x);
 fn_internal F32 m3f_det(M3F x);
 fn_internal F32 m4f_det(M4F x);
 fn_internal B32 m4f_inv(M4F x, M4F *solved);
+
+// ------------------------------------------------------------
+// #-- Homogeneous matrix ops
+
+fn_internal M4F m4f_hom_look_at(V3F up, V3F eye, V3F look_at) {
+  V3F z_axis = v3f_noz(v3f_sub(eye, look_at));
+  V3F x_axis = v3f_noz(v3f_cross(up, z_axis));
+  V3F y_axis = v3f_noz(v3f_cross(z_axis, x_axis));
+
+  M4F result = {
+    .e11 = x_axis.x, .e12 = x_axis.y, .e13 = x_axis.z, .e14 = -v3f_dot(x_axis, eye),
+    .e21 = y_axis.x, .e22 = y_axis.y, .e23 = y_axis.z, .e24 = -v3f_dot(y_axis, eye),
+    .e31 = z_axis.x, .e32 = z_axis.y, .e33 = z_axis.z, .e34 = -v3f_dot(z_axis, eye),
+    .e41 = 0,        .e42 = 0,        .e43 = 0,        .e44 = 1,
+  };
+
+  return result;
+}
+
+fn_internal M4F m4f_hom_perspective(F32 aspect_ratio, F32 field_of_view, F32 near_plane, F32 far_plane) {
+  F32 tan_fov_by_2 = f32_tan(.5f * field_of_view);
+  F32 plane_dist   = far_plane - near_plane;
+
+  M4F result = {
+    .e11 = f32_div_safe(1.f, aspect_ratio * tan_fov_by_2),
+    .e22 = f32_div_safe(1.f, tan_fov_by_2),
+    .e33 = -f32_div_safe(far_plane + near_plane, plane_dist),
+    .e34 = -f32_div_safe(2.f * far_plane * near_plane, plane_dist),
+    .e43 = -1,
+  };
+
+  return result;
+}
+
+fn_internal M4F m4f_hom_orthographic(V2F bottom_left, V2F top_right, F32 near_plane, F32 far_plane) {
+  /*
+| 2/(r-l)        0            0      -(r+l)/(r-l) |
+|    0        2/(t-b)         0      -(t+b)/(t-b) |
+|    0           0        -2/(f-n)   -(f+n)/(f-n) |
+|    0           0            0            1      |
+*/
+
+  M4F result = {
+    .e11 = f32_div_safe(2.f, top_right.x - bottom_left.x),
+    .e22 = f32_div_safe(2.f, top_right.y - bottom_left.y),
+    .e33 = f32_div_safe(-2.f, far_plane - near_plane),
+    .e44 = 1.f,
+
+    .e14 = -f32_div_safe(top_right.x + bottom_left.x, top_right.x - bottom_left.x),
+    .e24 = -f32_div_safe(top_right.y + bottom_left.y, top_right.y - bottom_left.y),
+    .e34 = -f32_div_safe(far_plane + near_plane,      far_plane - near_plane),
+  };
+
+  return m4f_trans(result);
+}
+
+
+
 
 // ------------------------------------------------------------
 // #-- Color Spaces

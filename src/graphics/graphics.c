@@ -190,6 +190,37 @@ fn_internal void g2_draw_tri_ext(G2_Tri *tri) {
   entry.vertices[2] = (R_Vertex_XUC_2D) { .X = tri->x3, .C = packed_color, .U = tri->u3, };
 }
 
+fn_internal void g2_draw_rect_grad_ext(G2_Rect_Grad *rect) {
+  G2_Draw_Entry entry = g2_push_draw(4, 6, rect->tex, G2_Draw_Mode_Flat);
+
+  entry.indices[0] = entry.base_index;
+  entry.indices[1] = entry.base_index + 1;
+  entry.indices[2] = entry.base_index + 2;
+  entry.indices[3] = entry.base_index;
+  entry.indices[4] = entry.base_index + 2;
+  entry.indices[5] = entry.base_index + 3;
+  
+  U32 packed_color_0 = abgr_u32_from_rgba_premul(rect->color_array[0]);
+  U32 packed_color_1 = abgr_u32_from_rgba_premul(rect->color_array[1]);
+  U32 packed_color_2 = abgr_u32_from_rgba_premul(rect->color_array[2]);
+  U32 packed_color_3 = abgr_u32_from_rgba_premul(rect->color_array[3]);
+
+  V2F X0 = rect->pos;
+  V2F X1 = v2f_add(rect->pos, v2f(rect->size.x, 0));
+  V2F X2 = v2f_add(rect->pos, rect->size);
+  V2F X3 = v2f_add(rect->pos, v2f(0, rect->size.y));
+
+  V2F U0 = rect->uv_array[0];
+  V2F U1 = rect->uv_array[1];
+  V2F U2 = rect->uv_array[2];
+  V2F U3 = rect->uv_array[3];
+  
+  entry.vertices[0] = (R_Vertex_XUC_2D) { .X = X0, .C = packed_color_0, .U = U0, };
+  entry.vertices[1] = (R_Vertex_XUC_2D) { .X = X1, .C = packed_color_1, .U = U1, };
+  entry.vertices[2] = (R_Vertex_XUC_2D) { .X = X2, .C = packed_color_2, .U = U2, };
+  entry.vertices[3] = (R_Vertex_XUC_2D) { .X = X3, .C = packed_color_3, .U = U3, };
+}
+
 fn_internal void g2_draw_rect_ext(G2_Rect *rect) {
   G2_Draw_Entry entry = g2_push_draw(4, 6, rect->tex, G2_Draw_Mode_Flat);
 

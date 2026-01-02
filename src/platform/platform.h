@@ -68,6 +68,7 @@ typedef struct Platform_Display {
   U64 frame_index;
   F32 frame_delta;
   V2F resolution;
+  F32 aspect_ratio;
 } Platform_Display;
 
 typedef struct Platform_Frame_State {

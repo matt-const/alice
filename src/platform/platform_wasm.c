@@ -65,6 +65,7 @@ fn_internal void wasm_update_frame_state(Platform_Frame_State *state) {
   state->display.frame_index += 1;
   state->display.frame_delta  = WASM_Shared_Frame_State.display_frame_delta;
   state->display.resolution   = v2f(WASM_Shared_Frame_State.display_resolution_width, WASM_Shared_Frame_State.display_resolution_height);
+  state->display.aspect_ratio = f32_div_safe(state->display.resolution.x, state->display.resolution.y);
 
   wasm_update_input(&state->input);
 }

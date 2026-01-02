@@ -89,6 +89,16 @@ var_global Str webgpu_shader_source_flat_2D = str_lit(
 "}\n"
 );
 
+var_global U08 webgpu_shader_source_flat_3D_dat[] = {
+#embed "flat_3D.wgsl"
+};
+
+
+var_global Str webgpu_shader_source_flat_3D = {
+  .len = sizeof(webgpu_shader_source_flat_3D_dat),
+  .txt = webgpu_shader_source_flat_3D_dat,
+};
+
 // ------------------------------------------------------------
 // #-- Render API implementation.
 
@@ -145,6 +155,7 @@ fn_internal void r_pipeline_destroy(R_Pipeline *pipeline) {
 
 fn_internal void webgpu_create_default_shaders(void) {
   R_Shader_Flat_2D = js_webgpu_shader_create((U32)webgpu_shader_source_flat_2D.len, webgpu_shader_source_flat_2D.txt);
+  R_Shader_Flat_3D = js_webgpu_shader_create((U32)webgpu_shader_source_flat_3D.len, webgpu_shader_source_flat_3D.txt);
 }
 
 fn_internal void webgpu_create_default_textures(void) {

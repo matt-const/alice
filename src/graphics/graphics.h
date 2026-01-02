@@ -34,6 +34,26 @@ fn_internal void g2_draw_tri_ext(G2_Tri *tri);
 
 // NOTE(cmat): Rectangle
 
+typedef struct G2_Rect_Grad {
+  V2F       pos;
+  V2F       size;
+  V2F       *uv_array;
+  RGBA      *color_array;
+  R_Texture tex;
+} G2_Rect_Grad;
+
+fn_internal void g2_draw_rect_grad_ext(G2_Rect_Grad *rect);
+#define g2_draw_rect_grad(pos_, size_, color_array_, uv_array_, ...)    \
+  g2_draw_rect_grad_ext(&(G2_Rect_Grad) {                               \
+      .pos            = pos_,                                           \
+      .size           = size_,                                          \
+      .uv_array       = uv_array_,                                      \
+      .color_array    = color_array_,                                   \
+      .tex            = R_Texture_White,                                \
+      ##__VA_ARGS__,                                                    \
+  })
+
+
 typedef struct G2_Rect {
   V2F       pos;
   V2F       size;

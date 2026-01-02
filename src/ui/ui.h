@@ -10,28 +10,35 @@
 
 typedef U32 UI_Flags;
 enum {
-  UI_Flag_None                  = 0,
 
-  // NOTE(cmat): Action Response
-  UI_Flag_Response_Hover        = 1 << 0,
-  UI_Flag_Response_Down         = 1 << 1,
+  // NOTE(cmat): No flags (invisible container purely for layout purposes).
+  UI_Flag_None                    = 0,
 
-  UI_Flag_Response_Press        = 1 << 2, // NOTE(cmat): A press triggers ONCE, after a mouse click.
-  UI_Flag_Response_Release      = 1 << 3, // NOTE(cmat): A release triggers ONCE, after the mouse is released.
+  // NOTE(cmat): Action Response.
+  UI_Flag_Response_Hover          = 1 << 0,
+  UI_Flag_Response_Down           = 1 << 1,
 
-  // NOTE(cmat): Layout
-  UI_Flag_Layout_Float_X        = 1 << 4,
-  UI_Flag_Layout_Float_Y        = 1 << 5,
+  UI_Flag_Response_Press          = 1 << 2, // NOTE(cmat): A press triggers ONCE, after a mouse click.
+  UI_Flag_Response_Release        = 1 << 3, // NOTE(cmat): A release triggers ONCE, after the mouse is released.
 
-  // NOTE(cmat): Draw flags
-  UI_Flag_Draw_Background       = 1 << 6,
-  UI_Flag_Draw_Shadow           = 1 << 7,
-  UI_Flag_Draw_Rounded          = 1 << 8,
-  UI_Flag_Draw_Label            = 1 << 9,
-  UI_Flag_Draw_Clip_Content     = 1 << 10,
-  UI_Flag_Draw_Content_Hook     = 1 << 11,
-  UI_Flag_Draw_Border           = 1 << 12,
-  UI_Flag_Draw_Inner_Fill       = 1 << 13,
+  // NOTE(cmat): Layout.
+  UI_Flag_Layout_Float_X          = 1 << 4,
+  UI_Flag_Layout_Float_Y          = 1 << 5,
+
+  // NOTE(cmat): Draw flags.
+  UI_Flag_Draw_Background         = 1 << 6,
+  UI_Flag_Draw_Shadow             = 1 << 7,
+  UI_Flag_Draw_Rounded            = 1 << 8,
+  UI_Flag_Draw_Label              = 1 << 9,
+  UI_Flag_Draw_Clip_Content       = 1 << 10,
+  UI_Flag_Draw_Content_Hook       = 1 << 11,
+  UI_Flag_Draw_Border             = 1 << 12,
+  UI_Flag_Draw_Inner_Fill         = 1 << 13,
+
+  // NOTE(cmat): Animation flags.
+  UI_Flag_Animation_Grow_X        = 1 << 14,
+  UI_Flag_Animation_Grow_Y        = 1 << 15,
+  UI_Flag_Animation_Fade_In       = 1 << 16,
 };
 
 typedef struct UI_Response {
@@ -77,12 +84,19 @@ typedef struct UI_Color_Palette {
   HSV inner_fill;
 } UI_Color_Palette;
 
+#define UI_DRAW_CONTENT_HOOK(name_) void name_(UI_Response *response, R2F draw_region, void *user_data);
+typedef UI_DRAW_CONTENT_HOOK(UI_Draw_Content_Hook);
+
 typedef struct UI_Draw {
-  FO_Font *font;
-  I32      inner_fill_border;
+  FO_Font              *font;
+  I32                   inner_fill_border;
+
+  UI_Draw_Content_Hook *content_hook;
+  void                 *content_user_data;
 } UI_Draw;
 
 typedef struct UI_Animation {
+  F32 spawn_t;
   F32 hover_t;
   F32 down_t;
 } UI_Animation;
@@ -114,7 +128,7 @@ typedef struct UI_Key {
 typedef struct UI_Node {
   UI_Node          *hash_next;
   UI_Node          *overlay_next;
-
+  U64               frame_index;
   UI_Key            key;
   UI_Flags          flags;
   UI_Node_Tree      tree;

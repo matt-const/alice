@@ -194,7 +194,6 @@ fn_internal void r_frame_flush        (void);
 
 var_external R_Shader  R_Shader_Flat_2D;
 var_external R_Shader  R_Shader_Flat_3D;
-var_external R_Shader  R_Shader_MTSDF_2D;
 
 var_external R_Texture R_Texture_White;
 

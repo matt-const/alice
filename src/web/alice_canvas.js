@@ -1,3 +1,8 @@
+// (C) Copyright 2025 Matyas Constans
+// Licensed under the MIT License (https://opensource.org/license/mit/)
+
+// document.body.style.cursor = "crosshair";
+
 const wasm_context = {
   canvas:           null,
   memory:           null,
@@ -60,6 +65,67 @@ function js_core_panic(string_len, string_txt) {
   const js_string = js_string_from_c_string(string_len, string_txt);
   alert(js_string);
   throw "PANIC ## " + js_string;
+}
+// ------------------------------------------------------------
+// #-- NOTE(cmat): JS - WASM http API.
+
+const HTTP_Status_Failed      = 0;
+const HTTP_Status_Done        = 1;
+const HTTP_Status_In_Progress = 2;
+
+function js_http_request_send(request_ptr, arena_ptr, url_len, url_txt) {
+  const request_view = new DataView(wasm_context.memory.buffer, request_ptr, 4 * 4);
+  
+  const url = js_string_from_c_string(url_len, url_txt);
+  const xhr = new XMLHttpRequest();
+  xhr.open("GET", url, true);
+  xhr.responseType = "arraybuffer";
+
+  // NOTE(cmat): Download in progress.
+  xhr.onprogress = function(event) {
+    if (event.lengthComputable) {
+      console.log("current downloading ...");
+      let offset = 0;
+      request_view.setUint32(offset, HTTP_Status_In_Progress, true); offset += 4;
+      request_view.setUint32(offset, event.loaded,            true); offset += 4;
+      request_view.setUint32(offset, event.total,             true); offset += 4;
+      request_view.setUint32(offset, 0,                       true); offset += 4;
+    } else {
+      let offset = 0;
+      request_view.setUint32(offset, HTTP_Status_In_Progress, true); offset += 4;
+      request_view.setUint32(offset, 0,                       true); offset += 4;
+      request_view.setUint32(offset, 0,                       true); offset += 4;
+      request_view.setUint32(offset, 0,                       true); offset += 4;
+    }
+  };
+
+  // NOTE(cmat): Download completed.
+  xhr.onload = function() {
+    if (xhr.status == 200) {
+      console.log("download succeeded!");
+      const data      = xhr.response;
+      const bytes     = data.byteLength;
+      const dst_ptr   = wasm_context.export_table.wasm_arena_push_size(arena_ptr, bytes);
+      const dst_wasm  = new Uint8Array(wasm_context.memory.buffer, dst_ptr, bytes);
+      dst_wasm.set(data);
+      
+      let offset = 0;
+      request_view.setUint32(offset, HTTP_Status_Done, true); offset += 4;
+      request_view.setUint32(offset, bytes,            true); offset += 4;
+      request_view.setUint32(offset, bytes,            true); offset += 4;
+      request_view.setUint32(offset, dst_ptr,          true); offset += 4;
+
+    } else {
+      console.log("download failed!");
+      let offset = 0;
+      request_view.setUint32(offset, HTTP_Status_Failed, true); offset += 4;
+      request_view.setUint32(offset, 0,                  true); offset += 4;
+      request_view.setUint32(offset, 0,                  true); offset += 4;
+      request_view.setUint32(offset, 0,                  true); offset += 4;
+    }
+  };
+
+  xhr.send();
 }
 
 // ------------------------------------------------------------
@@ -292,13 +358,6 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr) {
       buffers: [
         {
           arrayStride: stride,
-/*
-          attributes: [
-            { shaderLocation: 0, offset: 0,   format: 'float32x2' }, // X
-            { shaderLocation: 1, offset: 16,  format: 'float32x2' }, // U
-            { shaderLocation: 2, offset: 32,  format: 'uint32'    }, // C
-          ]
-*/
           attributes: attribute_list,
         }
       ]
@@ -318,7 +377,8 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr) {
       ]
     },
 
-    primitive: { topology: 'triangle-list' }
+    primitive: { topology: 'triangle-list' },
+    cullMode: 'none',
   });
 
   return wasm_context.webgpu.handle_map.store(render_pipeline);
@@ -381,8 +441,8 @@ function js_webgpu_frame_flush(draw_command_ptr) {
   // const pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
 
   // NOTE(cmat): Viewport.
-  wasm_context.webgpu_pass_encoder.setViewport(draw_region_x0, draw_region_y0, draw_region_width, draw_region_height, 0.0, 1.0);
-  wasm_context.webgpu_pass_encoder.setScissorRect(clip_region_x0, clip_region_y0, clip_region_width, clip_region_height);
+  wasm_context.webgpu_pass_encoder.setViewport(draw_region_x0,    wasm_context.canvas.height - (draw_region_y0 + draw_region_height), draw_region_width, draw_region_height, 0.0, 1.0);
+  wasm_context.webgpu_pass_encoder.setScissorRect(clip_region_x0, wasm_context.canvas.height - (clip_region_y0 + clip_region_height), clip_region_width, clip_region_height);
 
   wasm_context.webgpu_pass_encoder.setPipeline(pipeline);
   wasm_context.webgpu_pass_encoder.setBindGroup(0, bind_group);
@@ -420,7 +480,6 @@ function canvas_next_frame() {
 
   wasm_pack_frame_state(wasm_context.frame_state)
   const command_encoder = wasm_context.webgpu.device.createCommandEncoder();
-
   const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();
   const render_pass_descriptor = {
     colorAttachments: [{
@@ -461,6 +520,9 @@ function wasm_module_load(wasm_bytecode) {
       js_core_stream_write:           js_core_stream_write,
       js_core_unix_time:              js_core_unix_time,
       js_core_panic:                  js_core_panic,
+
+      // NOTE(cmat): HTTP API.
+      js_http_request_send:           js_http_request_send,
 
       // NOTE(cmat): Platform API.
       js_platform_set_shared_memory:  js_platform_set_shared_memory,
@@ -552,3 +614,4 @@ function wasm_module_load(wasm_bytecode) {
 fetch("alice_canvas.wasm")
   .then(response => response.arrayBuffer())
   .then(bytes    => wasm_module_load(bytes));
+

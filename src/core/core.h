@@ -98,6 +98,12 @@
 # endif
 #endif
 
+#if ARCH_WASM
+#define ARCH_ADDRESS_SIZE 32
+#else
+#define ARCH_ADDRESS_SIZE 64
+#endif
+
 // ------------------------------------------------------------
 // #-- Compiler Warnings
 
@@ -105,6 +111,9 @@
 #pragma clang diagnostic ignored "-Winitializer-overrides"
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #pragma clang diagnostic ignored "-Wformat-invalid-specifier"
+
+// TODO(cmat): Roll our own meta-programming language and remove #embed.
+#pragma clang diagnostic ignored "-Wc23-extensions"
 #endif
 
 // ------------------------------------------------------------
@@ -119,8 +128,6 @@
 #define Macro_Join(x, y)   Macro_Join_1(x, y)
 
 #define Macro_Counter __COUNTER
-
-
 
 // ------------------------------------------------------------
 // #-- Compile-Time Assertion
@@ -184,6 +191,14 @@ typedef __uint16 U16;
 typedef __uint32 U32;
 typedef __uint64 U64;
 
+#endif
+
+#if ARCH_ADDRESS_SIZE == 32
+typedef U32 UAddr;
+typedef I32 IAddr;
+#elif ARCH_ADDRESS_SIZE == 64
+typedef U64 UAddr;
+typedef I64 IAddr;
 #endif
 
 typedef float  F32;

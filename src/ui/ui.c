@@ -190,16 +190,32 @@ fn_internal void ui_node_update_response(UI_Node *node) {
 fn_internal void ui_node_update_animation(UI_Node *node) {
   UI_Animation *anim = &node->animation;
 
+  U32 frame_index = platform_display()->frame_index;
+
+  // NOTE(cmat): If there were skipped frames, that is,
+  // the UI component was hidden, we invalidate the animation cache.
+  if (frame_index != node->frame_index + 1) {
+    zero_fill(anim);
+  }
+
+  node->frame_index = frame_index;
+
   F32 refresh_rate_coeff = platform_display()->frame_delta;
 
-  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, refresh_rate_coeff * 30.f);
-  anim->down_t  = f32_exp_smoothing(anim->down_t, node->response.down,   refresh_rate_coeff * 30.f);
+  anim->spawn_t = f32_exp_smoothing(anim->spawn_t, 1.f,                  f32_min(1.f, refresh_rate_coeff * 30.f));
+  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, f32_min(1.f, refresh_rate_coeff * 30.f));
+  anim->down_t  = f32_exp_smoothing(anim->down_t, node->response.down,   f32_min(1.f, refresh_rate_coeff * 30.f));
+
+#if 1
+  anim->spawn_t = anim->spawn_t > .99f ? 1.f : anim->spawn_t;
+  anim->spawn_t = anim->spawn_t < .01f ? 0.f : anim->spawn_t;
 
   anim->hover_t = anim->hover_t > .99f ? 1.f : anim->hover_t;
   anim->hover_t = anim->hover_t < .01f ? 0.f : anim->hover_t;
 
   anim->down_t = anim->down_t > .99f ? 1.f : anim->down_t;
   anim->down_t = anim->down_t < .01f ? 0.f : anim->down_t;
+#endif
 }
 
 fn_internal UI_ID ui_node_id(Str label, UI_ID parent_id) {
@@ -236,8 +252,8 @@ fn_internal UI_Node *ui_node_push(Str label, UI_Flags flags) {
   UI_Key   key       = (UI_Key) { .id = id, .label = label };
   UI_Node *node      = ui_cache(key);
 
-  node->flags     = flags;
-  node->draw.font = ui_font_current();
+  node->flags       = flags;
+  node->draw.font   = ui_font_current();
 
   ui_node_update_response   (node);
   ui_node_update_tree       (node, parent);
@@ -266,12 +282,25 @@ fn_internal void ui_solve_label(UI_Node *node) {
   }
 }
 
+// TODO(cmat): I don't like how we have to call ui_size_animate inside of each ui_solve_* function.
+// Seems clunky, but since there's a dependency between stages, I don't see a better way right now.
+// Maybe we can make this explicit or something, right after the solve calls, but again, it's hard
+// because some passes like Grow have also a fit pass beforehand.
+fn_internal void ui_size_animate(UI_Node *node, Axis2 axis) {
+  if ((axis == Axis2_X && (node->flags & UI_Flag_Animation_Grow_X)) ||
+      (axis == Axis2_Y && (node->flags & UI_Flag_Animation_Grow_Y))) {
+    node->solved.size.dat[axis] = f32_lerp(node->animation.spawn_t, 0.f, node->solved.size.dat[axis]);
+  }
+
+}
+
 fn_internal void ui_solve_layout_size_known_for_axis(UI_Node *node, Axis2 axis) {
   if (node) {
     UI_Size size = node->layout.size[axis];
     switch (size.type) {
       case UI_Size_Type_Fixed: {
         node->solved.size.dat[axis] = size.value;
+        ui_size_animate(node, axis);
       } break;
 
       case UI_Size_Type_Text: {
@@ -282,6 +311,8 @@ fn_internal void ui_solve_layout_size_known_for_axis(UI_Node *node, Axis2 axis) 
           node->solved.size.dat[axis] = node->draw.font->metric_height;
           node->solved.size.dat[axis] += 2.f * node->layout.gap_border[Axis2_Y];
         }
+
+        ui_size_animate(node, axis);
       } break;
     }
 
@@ -340,6 +371,8 @@ fn_internal void ui_solve_layout_size_fit_for_axis(UI_Node *node, Axis2 axis) {
           }
 
         node->solved.size.dat[axis] = used_space;
+        ui_size_animate(node, axis);
+
       } break;
     }
   }
@@ -356,6 +389,7 @@ fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F
     switch (size.type) {
       case UI_Size_Type_Fill: {
         node->solved.size.dat[axis] += free_space;
+        ui_size_animate(node, axis);
       } break;
     }
 
@@ -387,7 +421,6 @@ fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F
       for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
         ui_solve_layout_size_fill_for_axis(it, axis, free_space);
       }
-
     }
   }
 }
@@ -464,10 +497,28 @@ fn_internal void ui_solve(UI_Node *node) {
 // ------------------------------------------------------------
 // #-- NOTE(cmat): Draw UI tree
 
-fn_internal void ui_draw(UI_Node *node) {
+typedef struct UI_Draw_Context {
+  F32 opacity;
+  R2I clip_region;
+} UI_Draw_Context;
+
+fn_internal void ui_draw(UI_Node *node, UI_Draw_Context *context) {
   if (node) {
 
+    F32 opacity = context->opacity;
+    if (node->flags & UI_Flag_Animation_Fade_In) {
+      opacity = f32_lerp(node->animation.spawn_t, 0.f, 1.f);
+    }
+
+    // TODO(cmat): Force clipping to be hierarchical.
     R2F region = node->solved.region_absolute;
+    R2I clip_region = context->clip_region;
+    if (node->flags & UI_Flag_Draw_Clip_Content) {
+      clip_region = r2i(region.x0, region.y0, region.x1, region.y1);
+    }
+
+    g2_clip_region(clip_region);
+
     if (node->flags & UI_Flag_Draw_Background) {
       HSV hsv_color = node->palette.idle;
 
@@ -476,7 +527,7 @@ fn_internal void ui_draw(UI_Node *node) {
 
       V4F rgb_color = { 0 };
       rgb_color.rgb = rgb_from_hsv(hsv_color);
-      rgb_color.a   = 1.f;
+      rgb_color.a   = opacity;
 
       V2F position = region.min;
       V2F size     = v2f_sub(region.max, region.min);
@@ -487,7 +538,7 @@ fn_internal void ui_draw(UI_Node *node) {
     if (node->flags & UI_Flag_Draw_Inner_Fill) {
       RGBA rgb_color = { };
       rgb_color.rgb = rgb_from_hsv(node->palette.inner_fill);
-      rgb_color.a   = 1.f;
+      rgb_color.a   = opacity;
 
       R2F region_inner_fill = r2f(region.x0 + node->draw.inner_fill_border,
                                   region.y0 + node->draw.inner_fill_border,
@@ -499,19 +550,30 @@ fn_internal void ui_draw(UI_Node *node) {
       g2_draw_rect(position, size, .color = rgb_color);
     }
 
-    if (node->flags & UI_Flag_Draw_Label) {
-      V2F text_at = v2f_add(region.min, v2f(0, -node->draw.font->metric_descent));
-
-      text_at = v2f_add(text_at, v2f(node->layout.gap_border[Axis2_X], node->layout.gap_border[Axis2_Y]));
-
-      g2_draw_text(node->solved.label, node->draw.font, v2f_add(text_at, v2f(1, -1)), .color = v4f(0, 0, 0, .6f));
-
-      text_at = v2f_add(text_at, v2f_lerp(node->animation.down_t, v2f(0, 0), v2f(1.f, -1.f)));
-      g2_draw_text(node->solved.label, node->draw.font, text_at, .color = v4f(1, 1, 1, 1));
+    if (node->flags & UI_Flag_Draw_Content_Hook) {
+      Assert(node->draw.content_hook, "draw content hook not set");
+      If_Likely (node->draw.content_hook) {
+        node->draw.content_hook(&node->response, region, node->draw.content_user_data);
+      }
     }
 
+    if (node->flags & UI_Flag_Draw_Label) {
+      V2F text_at = v2f_add(region.min, v2f(0, -node->draw.font->metric_descent));
+      text_at = v2f_add(text_at, v2f(node->layout.gap_border[Axis2_X], node->layout.gap_border[Axis2_Y]));
+
+      g2_draw_text(node->solved.label, node->draw.font, v2f_add(text_at, v2f(1, -1)), .color = v4f(0, 0, 0, opacity * .6f));
+
+      text_at = v2f_add(text_at, v2f_lerp(node->animation.down_t, v2f(0, 0), v2f(1.f, -1.f)));
+      g2_draw_text(node->solved.label, node->draw.font, text_at, .color = v4f(1, 1, 1, opacity));
+    }
+
+    UI_Draw_Context child_context = {
+      .opacity     = opacity,
+      .clip_region = clip_region,
+    };
+
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
-      ui_draw(it);
+      ui_draw(it, &child_context);
     }
   }
 }
@@ -534,14 +596,19 @@ fn_internal void ui_frame_end(void) {
   ui_parent_pop();
   Assert(UI_State.parent_stack_len == 0, "mismatched ui_parent_push(), pop missing");
 
+  UI_Draw_Context draw_context = {
+    .opacity = 1.f,
+    .clip_region = G2_Clip_None,
+  };
+
   // NOTE(cmat): Solve and draw root.
   ui_solve  (UI_State.root);
-  ui_draw   (UI_State.root);
+  ui_draw   (UI_State.root, &draw_context);
 
   // NOTE(cmat): Solve and draw overlays.
   for (UI_Node *it = UI_State.overlay_list.first; it; it = it->overlay_next) {
     ui_solve  (it);
-    ui_draw   (it);
+    ui_draw   (it, &draw_context);
   }
 }
 
