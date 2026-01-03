@@ -4,13 +4,12 @@ var Texture : texture_2d<f32>;
 @group(0) @binding(1)
 var Sampler : sampler;
 
-struct World_3D_Type {
-  @align(16) World_View_Projection : mat4x4<f32>,
-  @align(16) Eye_Position          : vec3<f32>,
+struct Viewport_2D_Type {
+  @align(16) NDC_From_Screen : mat4x4<f32>,
 };
 
 @group(0) @binding(2)
-var<uniform> World_3D : World_3D_Type;
+var<uniform> Viewport_2D : Viewport_2D_Type;
 
 fn vec4_unpack_u32(packed: u32) -> vec4<f32> {
   let r = f32((packed >> 0)  & 0xFFu) / 255.0;
@@ -28,13 +27,13 @@ struct VS_Out {
 };
 
 @vertex
-fn vs_main(@location(0) X : vec3<f32>,
+fn vs_main(@location(0) X : vec2<f32>,
            @location(1) U : vec2<f32>,
            @location(2) C : u32) -> VS_Out {
 
    var out : VS_Out;
 
-   out.X = transpose(World_3D.World_View_Projection) * vec4<f32>(X, 1.0);
+   out.X = transpose(Viewport_2D.NDC_From_Screen) * vec4<f32>(X, 0.0, 1.0);
    out.C = vec4_unpack_u32(C);
    out.U = U;
 
@@ -49,4 +48,3 @@ fn fs_main(@location(0) C : vec4<f32>,
    let color         = color_texture * C;
    return color;
 }
-

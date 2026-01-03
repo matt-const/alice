@@ -15,6 +15,10 @@ var_global struct {
 
   U32 mouse_position_x;
   U32 mouse_position_y;
+
+  F32 mouse_scroll_dt_x;
+  F32 mouse_scroll_dt_y;
+
   U32 mouse_button_left;
   U32 mouse_button_right;
   U32 mouse_button_middle;
@@ -51,6 +55,9 @@ fn_internal void wasm_update_input(Platform_Input *input) {
   V2F new_position          = v2f((F32)WASM_Shared_Frame_State.mouse_position_x, (F32)WASM_Shared_Frame_State.mouse_position_y);
   input->mouse.position_dt  = v2f_sub(new_position, input->mouse.position);
   input->mouse.position     = new_position;
+
+  input->mouse.scroll_dt.x  = WASM_Shared_Frame_State.mouse_scroll_dt_x;
+  input->mouse.scroll_dt.y  = WASM_Shared_Frame_State.mouse_scroll_dt_y;
 
   input->mouse.left.down_first_frame    = WASM_Shared_Frame_State.mouse_button_left && !input->mouse.left.down;
   input->mouse.right.down_first_frame   = WASM_Shared_Frame_State.mouse_button_right && !input->mouse.right.down;

@@ -102,7 +102,7 @@ typedef struct {
 
 #pragma pack(pop)
 
-fn_internal R_Pipeline r_pipeline_create  (R_Shader shader, R_Vertex_Format *format);
+fn_internal R_Pipeline r_pipeline_create  (R_Shader shader, R_Vertex_Format *format, B32 depth_buffer);
 fn_internal void       r_pipeline_destroy (R_Pipeline *pipeline);
 
 typedef struct {
@@ -194,6 +194,7 @@ fn_internal void r_frame_flush        (void);
 
 var_external R_Shader  R_Shader_Flat_2D;
 var_external R_Shader  R_Shader_Flat_3D;
+var_external R_Shader  R_Shader_Grid_3D;
 
 var_external R_Texture R_Texture_White;
 

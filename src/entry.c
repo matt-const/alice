@@ -28,9 +28,13 @@
 
 #include "http/http_wasm.c"
 
+#include "stl.h"
+
 #include "figtree_regular.c"
 #include "font_awesome_7_solid.c"
 
+U32 fps_at = 0;
+F32 fps_ring[200] = { };
 
 #define ICON_FA_PLAY  "\xef\x81\x8b"	// U+f04b
 #define ICON_FA_PAUSE "\xef\x81\x8c"	// U+f04c
@@ -41,7 +45,6 @@
 var_global FO_Font  UI_Font_Text       = { };
 var_global FO_Font  UI_Font_Icon       = { };
 var_global Arena    Permanent_Storage  = { };
-var_global B32      camera_orthographic = 0;
 
 var_global B32      context_menu       = 0;
 var_global V2F      context_menu_at    = { };
@@ -54,23 +57,35 @@ R_Buffer    vertex_buffer;
 R_Buffer    world_buffer;
 R_Pipeline  pipeline;
 
+B32         loaded_model;
+R_Buffer    model_index_buffer;
+R_Buffer    model_vertex_buffer;
+U32         model_index_count;
+R_Pipeline  model_pipeline;
 
 typedef struct Camera {
   V3F look_at;
   F32 radius_m;
   F32 theta_deg;
   F32 phi_deg;
+
+  F32 radius_m_t;
+  F32 theta_deg_t;
+  F32 phi_deg_t;
+
   F32 near_m;
   F32 far_m;
   F32 fov_deg;
+
   B32 orthographic;
+  F32 orthographic_t;
 } Camera;
 
 var_global Camera camera = {
   .look_at      = { 0, 0, 0 },
   .radius_m     = 10.f,
-  .theta_deg    = 0.f,
-  .phi_deg      = 90.f,
+  .theta_deg    = 45.f,
+  .phi_deg      = 45.f,
   .near_m       = 1.f,
   .far_m        = 5000.f,
   .fov_deg      = 60.f,
@@ -78,32 +93,46 @@ var_global Camera camera = {
 };
 
 fn_internal M4F camera_view(Camera *camera) {
-  F32 theta_rad = f32_radians_from_degrees(camera->theta_deg);
-  F32 phi_rad   = f32_radians_from_degrees(camera->phi_deg);
+  F32 theta_rad = f32_radians_from_degrees(camera->theta_deg_t);
+  F32 phi_rad   = f32_radians_from_degrees(camera->phi_deg_t);
 
-  V3F position = v3f_mul(camera->radius_m, v3f(f32_cos(theta_rad) * f32_sin(phi_rad),
-                                               f32_sin(phi_rad)   * f32_sin(phi_rad),
-                                               f32_cos(phi_rad)));
+  V3F position = v3f_mul(camera->radius_m_t, v3f(f32_cos(theta_rad) * f32_sin(phi_rad),
+                                                 f32_cos(phi_rad),
+                                                 f32_sin(theta_rad) * f32_sin(phi_rad)));
 
   M4F view = m4f_hom_look_at(v3f(0, 1, 0), position, camera->look_at);
   return view;
+}
+
+fn_internal void camera_update(Camera *camera) {
+  F32 frame_delta = platform_display()->frame_delta;
+
+  camera->radius_m = f32_clamp(camera->radius_m, 3.f, 50.f);
+  camera->phi_deg  = f32_clamp(camera->phi_deg,  0.01f, 179.99f);
+
+  camera->radius_m_t      = f32_exp_smoothing(camera->radius_m_t,     camera->radius_m,     frame_delta * 15.f);
+  camera->theta_deg_t     = f32_exp_smoothing(camera->theta_deg_t,    camera->theta_deg,    frame_delta * 15.f);
+  camera->phi_deg_t       = f32_exp_smoothing(camera->phi_deg_t,      camera->phi_deg,      frame_delta * 15.f);
+
+  camera->orthographic_t  = f32_exp_smoothing(camera->orthographic_t, camera->orthographic, frame_delta * 15.f);
 }
 
 fn_internal M4F camera_projection(Camera *camera) {
   F32 fov_rad = f32_radians_from_degrees(camera->fov_deg);
 
   M4F projection = { };
-  if (!camera_orthographic) {
-    projection = m4f_hom_perspective(platform_display()->aspect_ratio, fov_rad, camera->near_m, camera->far_m);
-  } else {
-    F32 h        = 1.f;
-    F32 w        = h * platform_display()->aspect_ratio;
 
-    V2F bottom_left = v2f(-.5f * w, -.5f * h);
-    V2F top_right   = v2f(+.5f * w, +.5f * h);
-    projection = m4f_hom_orthographic(bottom_left, top_right, camera->near_m, camera->far_m);
-  }
 
+  M4F perspective = m4f_hom_perspective(platform_display()->aspect_ratio, fov_rad, camera->near_m, camera->far_m);
+ 
+  F32 h        = 2.f * camera->radius_m_t * f32_tan(.5f * fov_rad);
+  F32 w        = h * platform_display()->aspect_ratio;
+
+  V2F bottom_left = v2f(-.5f * w, -.5f * h);
+  V2F top_right   = v2f(+.5f * w, +.5f * h);
+  M4F orthographic = m4f_hom_orthographic(bottom_left, top_right, 0, 0);
+  
+  projection = m4f_lerp(camera->orthographic_t, perspective, orthographic);
   return projection;
 }
 
@@ -129,7 +158,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     ui_init(&UI_Font_Text);
 
     arena_init(&request_arena);
-    http_request_send(&request, &request_arena, str_lit("stanford_bunny.obj"));
+    http_request_send(&request, &request_arena, str_lit("stanford_dragon.stl"));
 
 
     F32 scale = 1000.0f;
@@ -145,7 +174,8 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
 
     U32 test_indices[] = { 0, 1, 2, 0, 2, 3 };
 
-    pipeline = r_pipeline_create(R_Shader_Flat_3D, &R_Vertex_Format_XUC_3D);
+    pipeline        = r_pipeline_create(R_Shader_Grid_3D, &R_Vertex_Format_XUC_3D, 1);
+    model_pipeline  = r_pipeline_create(R_Shader_Flat_3D, &R_Vertex_Format_XUC_3D, 1);
 
     vertex_buffer = r_buffer_allocate(sizeof(test_vertices), R_Buffer_Mode_Static);
     r_buffer_download(vertex_buffer, 0, sizeof(test_vertices), test_vertices);
@@ -154,8 +184,36 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     r_buffer_download(index_buffer, 0, sizeof(test_indices), test_indices);
   }
 
+  if (!loaded_model && request.status == HTTP_Status_Done) {
+    loaded_model = 1;
+
+    U32 tri_count = 0;
+    R_Vertex_XUC_3D *vertices = stl_parse_binary(&request_arena, request.bytes_total, request.bytes_data, &tri_count);
+    log_info("Loaded STL: %u triangles", tri_count);
+
+    model_vertex_buffer = r_buffer_allocate(3 * sizeof(R_Vertex_XUC_3D) * tri_count, R_Buffer_Mode_Static);
+    r_buffer_download(model_vertex_buffer, 0, 3 * sizeof(R_Vertex_XUC_3D) * tri_count, vertices);
+
+    U32 *indices = (U32 *)arena_push_size(&request_arena, 3 * sizeof(U32) * tri_count);
+    For_U32 (it, 3 * tri_count) {
+      indices[it] = it;
+    }
+
+    model_index_buffer = r_buffer_allocate(3 * sizeof(U32) * tri_count, R_Buffer_Mode_Static);
+    model_index_count  = 3 * tri_count;
+    r_buffer_download(model_index_buffer, 0, 3 * sizeof(U32) * tri_count, indices);
+  }
+
   var_local_persist F32 timer = 0; timer += .5f * 1 / 200.f;
 
+  if (platform_input()->mouse.left.down) {
+    camera.theta_deg += 10.f * platform_display()->frame_delta * platform_input()->mouse.position_dt.x;
+    camera.phi_deg   += 10.f * platform_display()->frame_delta * platform_input()->mouse.position_dt.y;
+  }
+
+  camera.radius_m += platform_input()->mouse.scroll_dt.y * .025f;
+
+  camera_update(&camera);
   M4F view = camera_view(&camera);
   M4F projection = camera_projection(&camera);
   M4F world_view_projection = m4f_mul(view, projection);
@@ -204,7 +262,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
   }
 
   UI_Parent_Scope(ui_container(str_lit("fill"), UI_Container_Mode_Box, Axis2_Y, UI_Size_Fit, UI_Size_Fit)) {
-    ui_checkbox(str_lit("orthographic"), &camera_orthographic);
+    ui_checkbox(str_lit("orthographic"), &camera.orthographic);
 
 #if 0
     UI_Font_Scope(&UI_Font_Icon) {
@@ -229,7 +287,28 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
   g2_draw_rect(v2f(0, 0), platform_display()->resolution, .color = v4f(.2f, .2f, .3f, 1));
   g2_submit_draw();
 
-  R_Command_Draw draw = {
+  if (loaded_model) {
+
+    R_Command_Draw draw_model = {
+      .constant_buffer  = world_buffer,
+      .vertex_buffer    = model_vertex_buffer,
+      .index_buffer     = model_index_buffer,
+      .pipeline         = model_pipeline,
+      .texture          = R_Texture_White,
+      .sampler          = R_Sampler_Linear_Clamp,
+
+      .draw_index_count  = model_index_count,
+      .draw_index_offset = 0,
+
+      .depth_test        = 1,
+      .draw_region       = r2i(0, 0, platform_display()->resolution.x, platform_display()->resolution.y),
+      .clip_region       = r2i(0, 0, platform_display()->resolution.x, platform_display()->resolution.y),
+    };
+
+    r_command_push_draw(&draw_model);
+  }
+
+  R_Command_Draw draw_grid = {
     .constant_buffer  = world_buffer,
     .vertex_buffer    = vertex_buffer,
     .index_buffer     = index_buffer,
@@ -240,12 +319,36 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     .draw_index_count = 6,
     .draw_index_offset = 0,
 
-    .depth_test        = 0,
+    .depth_test        = 1,
     .draw_region       = r2i(0, 0, platform_display()->resolution.x, platform_display()->resolution.y),
     .clip_region       = r2i(0, 0, platform_display()->resolution.x, platform_display()->resolution.y),
   };
 
-  r_command_push_draw(&draw);
+  r_command_push_draw(&draw_grid);
+  fps_ring[fps_at] = f32_div_safe(1, platform_display()->frame_delta);
+  fps_at = (fps_at + 1) % sarray_len(fps_ring);
+
+  F32 fps_avg = 0;
+  F32 fps_max = 0;
+  For_U32(it, sarray_len(fps_ring)) {
+    fps_avg += fps_ring[it];
+    fps_max = f32_max(fps_ring[it], fps_max);
+  }
+
+  F32 bar_w  = 2.f;
+  F32 bar_s  = 1.f;
+  F32 offset = (bar_w + bar_s);
+  For_U32(it, sarray_len(fps_ring)) {
+    g2_draw_rect(v2f(offset * it, 0), v2f(1.f, (fps_ring[it] / fps_max) * 300.f));
+  }
+
+
+  fps_avg /= sarray_len(fps_ring);
+
+  char buffer[512];
+  stbsp_snprintf(buffer, 512, "%.2f", fps_avg);
+
+  g2_draw_text(str_from_cstr(buffer), &UI_Font_Text, v2f(10, 300));
  
   ui_frame_end();
   g2_frame_flush();

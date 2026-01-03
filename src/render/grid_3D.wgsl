@@ -1,6 +1,6 @@
 @group(0) @binding(0)
 var Texture : texture_2d<f32>;
-  
+
 @group(0) @binding(1)
 var Sampler : sampler;
 
@@ -41,12 +41,29 @@ fn vs_main(@location(0) X : vec3<f32>,
    return out;
 }
 
+fn PristineGrid(uv: vec2f, lineWidth: vec2f) -> f32 {
+    let uvDDXY = vec4f(dpdx(uv), dpdy(uv));
+    let uvDeriv = vec2f(length(uvDDXY.xz), length(uvDDXY.yw));
+    let invertLine: vec2<bool> = lineWidth > vec2f(0.5);
+    let targetWidth: vec2f = select(lineWidth, 1 - lineWidth, invertLine);
+    let drawWidth: vec2f = clamp(targetWidth, uvDeriv, vec2f(0.5));
+    let lineAA: vec2f = uvDeriv * 1.5;
+    var gridUV: vec2f = abs(fract(uv) * 2.0 - 1.0);
+    gridUV = select(1 - gridUV, gridUV, invertLine);
+    var grid2: vec2f = smoothstep(drawWidth + lineAA, drawWidth - lineAA, gridUV);
+    grid2 *= saturate(targetWidth / drawWidth);
+    grid2 = mix(grid2, targetWidth, saturate(uvDeriv * 2.0 - 1.0));
+    grid2 = select(grid2, 1.0 - grid2, invertLine);
+    return mix(grid2.x, 1.0, grid2.y);
+}
+
+const line_width: vec2<f32> = vec2<f32>(0.01, 0.01);
+
 @fragment
 fn fs_main(@location(0) C : vec4<f32>,
            @location(1) U : vec2<f32> ) -> @location(0) vec4<f32> {
 
-   let color_texture = textureSample(Texture, Sampler, U);
-   let color         = color_texture * C;
-   return color;
+  let grid  = PristineGrid(U, line_width);
+  let color = mix(vec4<f32>(0.0, 0.0, 0.0, 0.0), vec4<f32>(1.0, 1.0, 1.0, 1.0), grid);
+  return color;
 }
-

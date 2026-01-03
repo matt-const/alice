@@ -2,6 +2,7 @@
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
 // document.body.style.cursor = "crosshair";
+const MSAA_Sample_Count = 4;
 
 const wasm_context = {
   canvas:           null,
@@ -18,8 +19,9 @@ const wasm_context = {
 
     input: {
       mouse: {
-        position: { x: 0, y: 0, },
-        button: { left: 0, right: 0, middle: 0, },
+        position:   { x: 0, y: 0, },
+        scroll_dt:  { x: 0, y: 0, },
+        button:     { left: 0, right: 0, middle: 0, },
       }
     }
   },
@@ -74,7 +76,6 @@ const HTTP_Status_Done        = 1;
 const HTTP_Status_In_Progress = 2;
 
 function js_http_request_send(request_ptr, arena_ptr, url_len, url_txt) {
-  const request_view = new DataView(wasm_context.memory.buffer, request_ptr, 4 * 4);
   
   const url = js_string_from_c_string(url_len, url_txt);
   const xhr = new XMLHttpRequest();
@@ -84,14 +85,16 @@ function js_http_request_send(request_ptr, arena_ptr, url_len, url_txt) {
   // NOTE(cmat): Download in progress.
   xhr.onprogress = function(event) {
     if (event.lengthComputable) {
-      console.log("current downloading ...");
       let offset = 0;
+      const request_view = new DataView(wasm_context.memory.buffer, request_ptr, 4 * 4);
       request_view.setUint32(offset, HTTP_Status_In_Progress, true); offset += 4;
       request_view.setUint32(offset, event.loaded,            true); offset += 4;
       request_view.setUint32(offset, event.total,             true); offset += 4;
       request_view.setUint32(offset, 0,                       true); offset += 4;
     } else {
       let offset = 0;
+
+      const request_view = new DataView(wasm_context.memory.buffer, request_ptr, 4 * 4);
       request_view.setUint32(offset, HTTP_Status_In_Progress, true); offset += 4;
       request_view.setUint32(offset, 0,                       true); offset += 4;
       request_view.setUint32(offset, 0,                       true); offset += 4;
@@ -102,22 +105,25 @@ function js_http_request_send(request_ptr, arena_ptr, url_len, url_txt) {
   // NOTE(cmat): Download completed.
   xhr.onload = function() {
     if (xhr.status == 200) {
-      console.log("download succeeded!");
       const data      = xhr.response;
       const bytes     = data.byteLength;
       const dst_ptr   = wasm_context.export_table.wasm_arena_push_size(arena_ptr, bytes);
+      const src_wasm  = new Uint8Array(data);
       const dst_wasm  = new Uint8Array(wasm_context.memory.buffer, dst_ptr, bytes);
-      dst_wasm.set(data);
-      
+
+      dst_wasm.set(src_wasm);
+
       let offset = 0;
+      const request_view = new DataView(wasm_context.memory.buffer, request_ptr, 4 * 4);
       request_view.setUint32(offset, HTTP_Status_Done, true); offset += 4;
       request_view.setUint32(offset, bytes,            true); offset += 4;
       request_view.setUint32(offset, bytes,            true); offset += 4;
       request_view.setUint32(offset, dst_ptr,          true); offset += 4;
 
     } else {
-      console.log("download failed!");
       let offset = 0;
+
+      const request_view = new DataView(wasm_context.memory.buffer, request_ptr, 4 * 4);
       request_view.setUint32(offset, HTTP_Status_Failed, true); offset += 4;
       request_view.setUint32(offset, 0,                  true); offset += 4;
       request_view.setUint32(offset, 0,                  true); offset += 4;
@@ -137,6 +143,30 @@ function js_platform_set_shared_memory(frame_state_address) {
 
 // ------------------------------------------------------------
 // #-- NOTE(cmat): JS - WASM webgpu API.
+
+function webgpu_update_buffers(width, height) {
+  if (wasm_context.webgpu.depth_texture) {
+    wasm_context.webgpu.depth_texture.destroy();
+    wasm_context.webgpu.color_texture.destroy();
+  }
+
+  wasm_context.webgpu.depth_texture = wasm_context.webgpu.device.createTexture({
+    size: [ width, height, 1 ],
+    sampleCount: MSAA_Sample_Count,
+    format: 'depth24plus',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+ 
+  wasm_context.webgpu.color_texture = wasm_context.webgpu.device.createTexture({
+    size: [ width, height, 1 ],
+    sampleCount: MSAA_Sample_Count,
+    format: wasm_context.webgpu.backbuffer_format,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+
+  wasm_context.webgpu.color_texture_view = wasm_context.webgpu.color_texture.createView();
+  wasm_context.webgpu.depth_texture_view = wasm_context.webgpu.depth_texture.createView();
+}
 
 async function webgpu_init(canvas) {
   if (!navigator.gpu) {
@@ -182,6 +212,12 @@ async function webgpu_init(canvas) {
     context:            webgpu_context,
     handle_map:         webgpu_handle_map,
     backbuffer_format:  webgpu_format,
+
+    color_texture:      null,
+    color_texture_view: null,
+
+    depth_texture:      null,
+    depth_texture_view: null,
   };
 }
 
@@ -308,7 +344,7 @@ const WebGPU_Vertex_Attribute_Format_Lookup_Name = [
   'uint32',
 ]
 
-function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr) {
+function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr, depth_buffer) {
   const pipeline_layout = wasm_context.webgpu.device.createPipelineLayout({
     bindGroupLayouts: [
       wasm_context.webgpu.device.createBindGroupLayout({
@@ -349,6 +385,21 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr) {
     attribute_list.push({ shaderLocation: it, offset: attribute_offset, format: WebGPU_Vertex_Attribute_Format_Lookup_Name[attribute_format] });
   }
 
+  var depth_stencil = null;
+  if (depth_buffer != 0) {
+    depth_stencil = {
+      format:             'depth24plus',
+      depthWriteEnabled:  true,
+      depthCompare:       'less',
+    }
+  } else {
+    depth_stencil = {
+      format:             'depth24plus',
+      depthWriteEnabled:  false,
+      depthCompare:       'always'// 'less',
+    }
+  }
+
   const render_pipeline = wasm_context.webgpu.device.createRenderPipeline({
     layout: pipeline_layout,
     
@@ -378,7 +429,10 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr) {
     },
 
     primitive: { topology: 'triangle-list' },
-    cullMode: 'none',
+    cullMode: 'back',
+
+    depthStencil: depth_stencil,
+    multisample: { count: MSAA_Sample_Count, },
   });
 
   return wasm_context.webgpu.handle_map.store(render_pipeline);
@@ -438,8 +492,6 @@ function js_webgpu_frame_flush(draw_command_ptr) {
     ]
   });
 
-  // const pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
-
   // NOTE(cmat): Viewport.
   wasm_context.webgpu_pass_encoder.setViewport(draw_region_x0,    wasm_context.canvas.height - (draw_region_y0 + draw_region_height), draw_region_width, draw_region_height, 0.0, 1.0);
   wasm_context.webgpu_pass_encoder.setScissorRect(clip_region_x0, wasm_context.canvas.height - (clip_region_y0 + clip_region_height), clip_region_width, clip_region_height);
@@ -449,22 +501,19 @@ function js_webgpu_frame_flush(draw_command_ptr) {
   wasm_context.webgpu_pass_encoder.setVertexBuffer(0, vertex_buffer);
   wasm_context.webgpu_pass_encoder.setIndexBuffer(index_buffer, "uint32");
   wasm_context.webgpu_pass_encoder.drawIndexed(draw_index_count, 1, draw_index_offset, 0, 0);
-
-  // pass_encoder.end();
-
-  // wasm_context.webgpu.device.queue.submit([command_encoder.finish()]);
 }
 
 function wasm_pack_frame_state(frame_state) {
-  const buffer_view = new DataView(wasm_context.memory.buffer, wasm_context.shared_memory.frame_state, 8 * 4);
+  const buffer_view = new DataView(wasm_context.memory.buffer, wasm_context.shared_memory.frame_state, 10 * 4);
   
   let offset = 0;
   buffer_view.setUint32   (offset, frame_state.display.resolution.width,  true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.display.resolution.height, true); offset += 4;
   buffer_view.setFloat32  (offset, frame_state.display.frame_delta,       true); offset += 4;
-
   buffer_view.setUint32   (offset, frame_state.input.mouse.position.x,    true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.input.mouse.position.y,    true); offset += 4;
+  buffer_view.setFloat32  (offset, frame_state.input.mouse.scroll_dt.x,   true); offset += 4;
+  buffer_view.setFloat32  (offset, frame_state.input.mouse.scroll_dt.y,   true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.input.mouse.button.left,   true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.input.mouse.button.right,  true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.input.mouse.button.middle, true); offset += 4;
@@ -472,9 +521,9 @@ function wasm_pack_frame_state(frame_state) {
   return buffer_view;
 }
 
-function canvas_next_frame() {
+function canvas_next_frame(timestamp) {
 
-  frametime_now                                 = performance.now();
+  const frametime_now                           = timestamp;
   wasm_context.frame_state.display.frame_delta  = 0.001 * (frametime_now - wasm_context.frame_time_last);
   wasm_context.frame_time_last                  = frametime_now;
 
@@ -483,17 +532,29 @@ function canvas_next_frame() {
   const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();
   const render_pass_descriptor = {
     colorAttachments: [{
-      view: backbuffer_texture_view,
+      view: wasm_context.webgpu.color_texture_view,
+      resolveTarget: backbuffer_texture_view,
       clearValue: { r:0, g:0, b:0, a:1 },
       loadOp: 'clear',
-      storeOp: 'store'
-    }]
+      storeOp: 'store',
+    }],
+
+    depthStencilAttachment: {
+      view: wasm_context.webgpu.depth_texture_view,
+      depthClearValue: 1.0,
+      depthLoadOp: 'clear',
+      depthStoreOp: 'store',
+    },
   };
 
   wasm_context.webgpu_pass_encoder = command_encoder.beginRenderPass(render_pass_descriptor);
   wasm_context.export_table.wasm_next_frame();
   wasm_context.webgpu_pass_encoder.end();
   wasm_context.webgpu.device.queue.submit([command_encoder.finish()]);
+
+  // NOTE(cmat): Reset scroll delta.
+  wasm_context.frame_state.input.mouse.scroll_dt.x = 0;
+  wasm_context.frame_state.input.mouse.scroll_dt.y = 0;
 
   requestAnimationFrame(canvas_next_frame);
 }
@@ -564,6 +625,9 @@ function wasm_module_load(wasm_bytecode) {
       wasm_context.frame_state.display.resolution.width  = wasm_context.canvas.width;
       wasm_context.frame_state.display.resolution.height = wasm_context.canvas.height;
 
+      // NOTE(cmat): Setup depth buffer.
+      webgpu_update_buffers(wasm_context.canvas.width, wasm_context.canvas.height);
+
       // NOTE(cmat): Dynamically modify canvas resolution.
       window.addEventListener('resize', () => {
         const resolution = window_resolution_pixels();
@@ -572,6 +636,8 @@ function wasm_module_load(wasm_bytecode) {
 
         wasm_context.frame_state.display.resolution.width  = wasm_context.canvas.width;
         wasm_context.frame_state.display.resolution.height = wasm_context.canvas.height;
+
+        webgpu_update_buffers(wasm_context.canvas.width, wasm_context.canvas.height);
       });
 
       // NOTE(cmat): Handle mouse events.
@@ -580,8 +646,14 @@ function wasm_module_load(wasm_bytecode) {
         const scale_x     = wasm_context.canvas.width / client_rect.width;
         const scale_y     = wasm_context.canvas.height / client_rect.height;
 
-        wasm_context.frame_state.input.mouse.position.x = (e.clientX - client_rect.left) * scale_x;
-        wasm_context.frame_state.input.mouse.position.y = wasm_context.canvas.height - (e.clientY - client_rect.top)  * scale_y;
+        var x = (e.clientX - client_rect.left) * scale_x;
+        var y = wasm_context.canvas.height - (e.clientY - client_rect.top)  * scale_y;
+
+        x = Math.max(0, Math.min(wasm_context.canvas.width,  x));
+        y = Math.max(0, Math.min(wasm_context.canvas.height, y));
+
+        wasm_context.frame_state.input.mouse.position.x = x;
+        wasm_context.frame_state.input.mouse.position.y = y;
       });
 
       window.addEventListener('mousedown', e => {
@@ -596,6 +668,12 @@ function wasm_module_load(wasm_bytecode) {
         if (e.button == 2) { wasm_context.frame_state.input.mouse.button.right  = 0 }
       });
 
+      window.addEventListener('wheel', e => {
+        wasm_context.frame_state.input.mouse.scroll_dt.x += e.deltaX;
+        wasm_context.frame_state.input.mouse.scroll_dt.y += e.deltaY;
+        e.preventDefault();
+      }, { passive: false });
+
       // NOTE(cmat): Disable context menu on canvas.
       wasm_context.canvas.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -604,8 +682,8 @@ function wasm_module_load(wasm_bytecode) {
       wasm_context.export_table.wasm_entry_point(cpu_logical_cores);
 
       // NOTE(cmat): Start animation frame requests
-      wasm_context.frame_time_last = performance.now();
-      canvas_next_frame();
+      wasm_context.frame_time_last = 0;
+      canvas_next_frame(0);
     });
   });
 }

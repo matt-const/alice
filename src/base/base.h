@@ -1439,12 +1439,6 @@ fn_internal M4F m4f_hom_perspective(F32 aspect_ratio, F32 field_of_view, F32 nea
 }
 
 fn_internal M4F m4f_hom_orthographic(V2F bottom_left, V2F top_right, F32 near_plane, F32 far_plane) {
-  /*
-| 2/(r-l)        0            0      -(r+l)/(r-l) |
-|    0        2/(t-b)         0      -(t+b)/(t-b) |
-|    0           0        -2/(f-n)   -(f+n)/(f-n) |
-|    0           0            0            1      |
-*/
 
   M4F result = {
     .e11 = f32_div_safe(2.f, top_right.x - bottom_left.x),
@@ -1452,16 +1446,13 @@ fn_internal M4F m4f_hom_orthographic(V2F bottom_left, V2F top_right, F32 near_pl
     .e33 = f32_div_safe(-2.f, far_plane - near_plane),
     .e44 = 1.f,
 
-    .e14 = -f32_div_safe(top_right.x + bottom_left.x, top_right.x - bottom_left.x),
-    .e24 = -f32_div_safe(top_right.y + bottom_left.y, top_right.y - bottom_left.y),
-    .e34 = -f32_div_safe(far_plane + near_plane,      far_plane - near_plane),
+    .e41 = -f32_div_safe(top_right.x + bottom_left.x, top_right.x - bottom_left.x),
+    .e42 = -f32_div_safe(top_right.y + bottom_left.y, top_right.y - bottom_left.y),
+    .e43 = -f32_div_safe(far_plane + near_plane,      far_plane - near_plane),
   };
 
-  return m4f_trans(result);
+  return result;
 }
-
-
-
 
 // ------------------------------------------------------------
 // #-- Color Spaces
@@ -1504,6 +1495,14 @@ inline fn_internal F32 f32_lerp  (F32 t, F32 a, F32 b)  { return (1.f - t) * a +
 inline fn_internal V2F v2f_lerp  (F32 t, V2F a, V2F b)  { return v2f_add(v2f_mul((1.f - t), a), v2f_mul(t, b)); }
 inline fn_internal V3F v3f_lerp  (F32 t, V3F a, V3F b)  { return v3f_add(v3f_mul((1.f - t), a), v3f_mul(t, b)); }
 inline fn_internal V4F v4f_lerp  (F32 t, V4F a, V4F b)  { return v4f_add(v4f_mul((1.f - t), a), v4f_mul(t, b)); }
+
+inline fn_internal M4F m4f_lerp  (F32 t, M4F a, M4F b) {
+  M4F result = { };
+  For_U32(it, 4 * 4) {
+    result.dat[it] = f32_lerp(t, a.dat[it], b.dat[it]);
+  }
+  return result;
+}
 
 #define rgb_lerp  v3f_lerp
 #define rgba_lerp v4f_lerp

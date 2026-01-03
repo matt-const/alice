@@ -28,7 +28,7 @@ fn_external void js_webgpu_sampler_destroy   (U32 sampler_handle);
 fn_external U32  js_webgpu_shader_create     (U32 string_len, void *string_ptr);
 fn_external U32  js_webgpu_shader_destroy    (U32 shader_handle);
 
-fn_external U32  js_webgpu_pipeline_create   (U32 shader_handle, void *vertex_format_ptr);
+fn_external U32  js_webgpu_pipeline_create   (U32 shader_handle, void *vertex_format_ptr, B32 depth_buffer);
 fn_external U32  js_webgpu_pipeline_destroy  (U32 pipeline_handle);
 
 fn_external void js_webgpu_frame_flush       (void *command_draw_ptr);
@@ -36,68 +36,35 @@ fn_external void js_webgpu_frame_flush       (void *command_draw_ptr);
 // ------------------------------------------------------------
 // #-- Built-in shaders.
 
-var_global Str webgpu_shader_source_flat_2D = str_lit(
-"@group(0) @binding(0)\n"
-"var Texture : texture_2d<f32>;\n"
-  
-"@group(0) @binding(1)\n"
-"var Sampler : sampler;\n"
+var_global U08 webgpu_shader_source_flat_2D_dat[] = {
+#embed "flat_2D.wgsl"
+};
 
-"struct Viewport_2D_Type {\n"
-"  @align(16) NDC_From_Screen : mat4x4<f32>,\n"
-"};\n"
+var_global Str webgpu_shader_source_flat_2D = {
+  .len = sizeof(webgpu_shader_source_flat_2D_dat),
+  .txt = webgpu_shader_source_flat_2D_dat,
+};
 
-"@group(0) @binding(2)\n"
-"var<uniform> Viewport_2D : Viewport_2D_Type;\n"
-
-"fn vec4_unpack_u32(packed: u32) -> vec4<f32> {\n"
-"  let r = f32((packed >> 0)  & 0xFFu) / 255.0;\n"
-"  let g = f32((packed >> 8)  & 0xFFu) / 255.0;\n"
-"  let b = f32((packed >> 16) & 0xFFu) / 255.0;\n"
-"  let a = f32((packed >> 24) & 0xFFu) / 255.0;\n"
-
-"    return vec4<f32>(r, g, b, a);\n"
-"}\n"
-
-"struct VS_Out {\n"
-"    @builtin(position)  X : vec4<f32>,\n"
-"    @location(0)        C : vec4<f32>,\n"
-"    @location(1)        U : vec2<f32>,\n"
-"};\n"
-
-"@vertex\n"
-"fn vs_main(@location(0) X : vec2<f32>,\n"
-"           @location(1) U : vec2<f32>,\n"
-"           @location(2) C : u32) -> VS_Out {\n"
-
-"   var out : VS_Out;\n"
-
-"   out.X = transpose(Viewport_2D.NDC_From_Screen) * vec4<f32>(X, 0.0, 1.0);\n"
-"   out.C = vec4_unpack_u32(C);\n"
-"   out.U = U;\n"
-
-"   return out;\n"
-"}\n"
-
-"@fragment\n"
-"fn fs_main(@location(0) C : vec4<f32>,\n"
-"           @location(1) U : vec2<f32> ) -> @location(0) vec4<f32> {\n"
-
-"   let color_texture = textureSample(Texture, Sampler, U);\n"
-"   let color         = color_texture * C;\n"
-"   return color;\n"
-"}\n"
-);
 
 var_global U08 webgpu_shader_source_flat_3D_dat[] = {
 #embed "flat_3D.wgsl"
 };
 
-
 var_global Str webgpu_shader_source_flat_3D = {
   .len = sizeof(webgpu_shader_source_flat_3D_dat),
   .txt = webgpu_shader_source_flat_3D_dat,
 };
+
+var_global U08 webgpu_shader_source_grid_3D_dat[] = {
+#embed "grid_3D.wgsl"
+};
+
+var_global Str webgpu_shader_source_grid_3D = {
+  .len = sizeof(webgpu_shader_source_grid_3D_dat),
+  .txt = webgpu_shader_source_grid_3D_dat,
+};
+
+
 
 // ------------------------------------------------------------
 // #-- Render API implementation.
@@ -140,8 +107,8 @@ fn_internal void r_sampler_destroy(R_Sampler *sampler) {
   *sampler = 0;
 }
 
-fn_internal R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format *format) {
-  R_Pipeline pipeline = js_webgpu_pipeline_create(shader, format);
+fn_internal R_Pipeline r_pipeline_create(R_Shader shader, R_Vertex_Format *format, B32 depth_buffer) {
+  R_Pipeline pipeline = js_webgpu_pipeline_create(shader, format, depth_buffer);
   return pipeline;
 }
 
@@ -156,6 +123,7 @@ fn_internal void r_pipeline_destroy(R_Pipeline *pipeline) {
 fn_internal void webgpu_create_default_shaders(void) {
   R_Shader_Flat_2D = js_webgpu_shader_create((U32)webgpu_shader_source_flat_2D.len, webgpu_shader_source_flat_2D.txt);
   R_Shader_Flat_3D = js_webgpu_shader_create((U32)webgpu_shader_source_flat_3D.len, webgpu_shader_source_flat_3D.txt);
+  R_Shader_Grid_3D = js_webgpu_shader_create((U32)webgpu_shader_source_grid_3D.len, webgpu_shader_source_grid_3D.txt);
 }
 
 fn_internal void webgpu_create_default_textures(void) {

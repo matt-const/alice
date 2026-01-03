@@ -53,7 +53,7 @@ fn_internal void g2_init(void) {
   G2_State.vertex_buffer = r_buffer_allocate(G2_State.buffer.vertex_capacity * sizeof(R_Vertex_XUC_2D), R_Buffer_Mode_Dynamic);
   G2_State.index_buffer  = r_buffer_allocate(G2_State.buffer.index_capacity  * sizeof(U32),             R_Buffer_Mode_Dynamic);
 
-  G2_State.pipelines[G2_Draw_Mode_Flat] = r_pipeline_create(R_Shader_Flat_2D, &R_Vertex_Format_XUC_2D);
+  G2_State.pipelines[G2_Draw_Mode_Flat] = r_pipeline_create(R_Shader_Flat_2D, &R_Vertex_Format_XUC_2D, 0);
   // G2_State.pipelines[G2_Draw_Mode_MTSDF]  = r_pipeline_create(R_Shader_MTSDF_2D,  &R_Vertex_Format_XUC_2D);
 
   G2_State.texture              = R_Texture_White;
