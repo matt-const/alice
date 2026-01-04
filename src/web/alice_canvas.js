@@ -546,6 +546,10 @@ function canvas_next_frame(timestamp) {
   wasm_context.frame_state.display.frame_delta  = 0.001 * (frametime_now - wasm_context.frame_time_last);
   wasm_context.frame_time_last                  = frametime_now;
 
+  // TODO(cmat): Pick a value based on the default display-framerate... how do
+  // we get the display refresh-rate from the browser though?
+  wasm_context.frame_state.display.frame_delta = Math.min(wasm_context.frame_state.display.frame_delta, 1 / 60);
+
   wasm_pack_frame_state(wasm_context.frame_state)
   const command_encoder = wasm_context.webgpu.device.createCommandEncoder();
   const backbuffer_texture_view = wasm_context.webgpu.context.getCurrentTexture().createView();

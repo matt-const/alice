@@ -636,10 +636,10 @@ fn_internal UI_Node *ui_container(Str label, UI_Container_Mode mode, Axis2 layou
   node->layout.size[Axis2_X]       = size_x;
   node->layout.size[Axis2_Y]       = size_y;
 
-  if (UI_Container_Mode_Box) {
-    node->layout.gap_border[Axis2_X] = 20;
-    node->layout.gap_border[Axis2_Y] = 20;
-    node->layout.gap_child           = 10;
+  if (mode == UI_Container_Mode_Box) {
+    node->layout.gap_border[Axis2_X] = 20; // 4
+    node->layout.gap_border[Axis2_Y] = 20; // 4
+    node->layout.gap_child           = 10; // 2
   }
 
   node->palette.idle  = hsv_u32(200, 10, 10);

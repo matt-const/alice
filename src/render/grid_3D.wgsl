@@ -41,6 +41,8 @@ fn vs_main(@location(0) X : vec3<f32>,
    return out;
 }
 
+// TODO(cmat): Temporary, based on https://github.com/toji/pristine-grid-webgpu.
+// TODO(cmat): Reimplement based on the original article, add major/minor grid rendering.
 fn PristineGrid(uv: vec2f, lineWidth: vec2f) -> f32 {
     let uvDDXY = vec4f(dpdx(uv), dpdy(uv));
     let uvDeriv = vec2f(length(uvDDXY.xz), length(uvDDXY.yw));

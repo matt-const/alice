@@ -46,6 +46,7 @@ F32 fps_ring[200] = { };
 
 #define ICON_FA_FILE  "\xef\x85\x9b"	// U+f15b
 #define ICON_FA_CUBE "\xef\x86\xb2"	// U+f1b2
+#define ICON_FA_CAMERA_RETRO "\xef\x82\x83"
 
 #define TEST_STR ICON_FA_PLAY " " ICON_FA_PAUSE " " ICON_FA_FILE
 
@@ -233,6 +234,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       codepoint_from_utf8(str_lit(ICON_FA_FORWARD_STEP), 0),
       codepoint_from_utf8(str_lit(ICON_FA_FONT), 0),
       codepoint_from_utf8(str_lit(ICON_FA_EYE), 0),
+      codepoint_from_utf8(str_lit(ICON_FA_CAMERA_RETRO), 0),
     };
 
     fo_font_init(&UI_Font_Text, &Permanent_Storage,
@@ -246,7 +248,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     ui_init(&UI_Font_Text);
 
     arena_init(&request_arena);
-    http_request_send(&request, &request_arena, str_lit("stanford_dragon.stl"));
+    http_request_send(&request, &request_arena, str_lit("test.stl"));
 
     F32 scale = 1000.0f;
     F32 vmin = -1.f * scale;
@@ -350,7 +352,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       UI_Node *entry_1 = ui_container(str_lit("entry_1"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fit);
       UI_Parent_Scope(entry_1) {
         UI_Font_Scope(&UI_Font_Icon) { ui_label(str_lit(ICON_FA_CUBE)); }
-        ui_label(str_lit("Dragon"));
+        ui_label(str_lit("Terrain"));
         ui_container(str_lit("center_padding"), UI_Container_Mode_None, Axis2_X, UI_Size_Fill, UI_Size_Fit);
         UI_Font_Scope(&UI_Font_Icon) { ui_button(str_lit(ICON_FA_EYE)); }
       }
@@ -367,9 +369,13 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
         ui_button(str_lit("Render"));
       }
 
-      UI_Node *draw_region = ui_container(str_lit("draw_region"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fill);
-      draw_region->flags |= UI_Flag_Draw_Content_Hook;
-      draw_region->draw.content_hook = draw_viewport;
+      UI_Node *content = ui_container(str_lit("content"), UI_Container_Mode_None, Axis2_X, UI_Size_Fill, UI_Size_Fill);
+      UI_Parent_Scope(content) {
+
+        UI_Node *draw_region = ui_container(str_lit("draw_region"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fill);
+        draw_region->flags |= UI_Flag_Draw_Content_Hook;
+        draw_region->draw.content_hook = draw_viewport;
+      }
     }
 
   }
