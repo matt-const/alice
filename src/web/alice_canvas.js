@@ -477,12 +477,6 @@ function js_webgpu_frame_flush(draw_command_ptr) {
   const texture         = wasm_context.webgpu.handle_map.get(texture_handle);
   const sampler         = wasm_context.webgpu.handle_map.get(sampler_handle);
 
-  const draw_region_width  = draw_region_x1 - draw_region_x0;
-  const draw_region_height = draw_region_y1 - draw_region_y0;
-
-  const clip_region_width  = clip_region_x1 - clip_region_x0;
-  const clip_region_height = clip_region_y1 - clip_region_y0;
-
   const bind_group = wasm_context.webgpu.device.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
     entries: [ 
@@ -492,9 +486,34 @@ function js_webgpu_frame_flush(draw_command_ptr) {
     ]
   });
 
-  // NOTE(cmat): Viewport.
-  wasm_context.webgpu_pass_encoder.setViewport(draw_region_x0,    wasm_context.canvas.height - (draw_region_y0 + draw_region_height), draw_region_width, draw_region_height, 0.0, 1.0);
-  wasm_context.webgpu_pass_encoder.setScissorRect(clip_region_x0, wasm_context.canvas.height - (clip_region_y0 + clip_region_height), clip_region_width, clip_region_height);
+
+  // NOTE(cmat): Set viewport.
+  let draw_x = draw_region_x0;
+  let draw_y = wasm_context.canvas.height - draw_region_y1;
+  let draw_w = draw_region_x1 - draw_region_x0;
+  let draw_h = draw_region_y1 - draw_region_y0;
+  
+  draw_x = Math.max(Math.min(draw_x, wasm_context.canvas.width),  0);
+  draw_y = Math.max(Math.min(draw_y, wasm_context.canvas.height), 0);
+
+  draw_w = Math.max(Math.min(draw_w, wasm_context.canvas.width - draw_x),  0);
+  draw_h = Math.max(Math.min(draw_h, wasm_context.canvas.height - draw_y), 0);
+
+  wasm_context.webgpu_pass_encoder.setViewport(draw_x, draw_y, draw_w, draw_h, 0.0, 1.0);
+
+  // NOTE(cmat): Set scissor rect
+  let clip_x = clip_region_x0;
+  let clip_y = wasm_context.canvas.height - clip_region_y1;
+  let clip_w = clip_region_x1 - clip_region_x0;
+  let clip_h = clip_region_y1 - clip_region_y0;
+  
+  clip_x = Math.max(Math.min(clip_x, draw_x + draw_w), draw_x);
+  clip_y = Math.max(Math.min(clip_y, draw_y + draw_h), draw_y);
+
+  clip_w = Math.max(Math.min(clip_w, draw_w - (clip_x - draw_x)), 0);
+  clip_h = Math.max(Math.min(clip_h, draw_h - (clip_y - draw_y)), 0);
+
+  wasm_context.webgpu_pass_encoder.setScissorRect(clip_x, clip_y, clip_w, clip_h);
 
   wasm_context.webgpu_pass_encoder.setPipeline(pipeline);
   wasm_context.webgpu_pass_encoder.setBindGroup(0, bind_group);

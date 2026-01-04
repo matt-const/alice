@@ -202,9 +202,9 @@ fn_internal void ui_node_update_animation(UI_Node *node) {
 
   F32 refresh_rate_coeff = platform_display()->frame_delta;
 
-  anim->spawn_t = f32_exp_smoothing(anim->spawn_t, 1.f,                  f32_min(1.f, refresh_rate_coeff * 30.f));
-  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, f32_min(1.f, refresh_rate_coeff * 30.f));
-  anim->down_t  = f32_exp_smoothing(anim->down_t, node->response.down,   f32_min(1.f, refresh_rate_coeff * 30.f));
+  anim->spawn_t = f32_exp_smoothing(anim->spawn_t, 1.f,                  f32_min(1.f, refresh_rate_coeff * 15.f));
+  anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, f32_min(1.f, refresh_rate_coeff * 15.f));
+  anim->down_t  = f32_exp_smoothing(anim->down_t, node->response.down,   f32_min(1.f, refresh_rate_coeff * 15.f));
 
 #if 1
   anim->spawn_t = anim->spawn_t > .99f ? 1.f : anim->spawn_t;
@@ -342,14 +342,14 @@ fn_internal void ui_solve_layout_size_fit_for_axis(UI_Node *node, Axis2 axis) {
           if (node) {
             if (axis == node->layout.direction) {
               F32 children_sum    = 0;
-              I32 children_count  = 0;
+              F32 children_count  = 0;
 
               for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
                 children_count += 1;
                 children_sum   += it->solved.size.dat[axis];
               }
 
-              used_space  = 2 * node->layout.gap_border[axis];
+              used_space += 2 * node->layout.gap_border[axis];
               used_space += children_sum;
               if (children_count) {
                 used_space += (children_count - 1) * node->layout.gap_child;
@@ -358,14 +358,14 @@ fn_internal void ui_solve_layout_size_fit_for_axis(UI_Node *node, Axis2 axis) {
             } else {
               // NOTE(cmat): Max of children sizes.
               F32 children_max   = 0;
-              I32 children_count = 0;
+              F32 children_count = 0;
 
               for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
                 children_count += 1;
                 children_max   = f32_max(children_max, it->solved.size.dat[axis]);
               }
 
-              used_space  = 2 * node->layout.gap_border[axis];
+              used_space += 2 * node->layout.gap_border[axis];
               used_space += children_max;
             }
           }
@@ -395,13 +395,13 @@ fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F
 
     if (axis != node->layout.direction) {
       for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {  
-        free_space = node->solved.size.dat[axis] - 2.f * it->solved.size.dat[axis];
+        free_space = node->solved.size.dat[axis] - it->solved.size.dat[axis] - 2.f * node->layout.gap_border[axis];
         ui_solve_layout_size_fill_for_axis(it, axis, free_space);
       }
     } else {
       F32 free_space          = node->solved.size.dat[axis];
-      I32 children_count      = 0;
-      I32 fill_children_count = 0;
+      F32 children_count      = 0;
+      F32 fill_children_count = 0;
 
       free_space -= 2.f * node->layout.gap_border[axis];
       for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
@@ -413,7 +413,7 @@ fn_internal void ui_solve_layout_size_fill_for_axis(UI_Node *node, Axis2 axis, F
       }
 
       if (children_count) {
-        free_space -= (node->layout.gap_child - 1) * children_count;
+        free_space -= (children_count - 1) * node->layout.gap_child;
       }
 
       free_space *= f32_div_safe(1.f, fill_children_count);
@@ -430,7 +430,7 @@ fn_internal void ui_solve_layout_size_fill(UI_Node *node, V2F free_space) {
   ui_solve_layout_size_fill_for_axis(node, Axis2_Y, free_space.y);
 }
 
-fn_internal F32 ui_solve_position_relative_for_axis(UI_Node *node, Axis2 axis, Axis2 layout_direction, I32 relative_position) {
+fn_internal F32 ui_solve_position_relative_for_axis(UI_Node *node, Axis2 axis, Axis2 layout_direction, F32 relative_position) {
   if (node) {
     if (axis == Axis2_X) {
       if (node->flags & UI_Flag_Layout_Float_X) {
@@ -452,7 +452,7 @@ fn_internal F32 ui_solve_position_relative_for_axis(UI_Node *node, Axis2 axis, A
       relative_position += node->solved.size.dat[axis];
     }
 
-    I32 child_position = node->layout.gap_border[axis];
+    F32 child_position = node->layout.gap_border[axis];
     for (UI_Node *it = node->tree.first_child; it; it = it->tree.next) {
       child_position = ui_solve_position_relative_for_axis(it, axis, node->layout.direction, child_position);
       if (node->layout.direction == axis)
@@ -635,9 +635,12 @@ fn_internal UI_Node *ui_container(Str label, UI_Container_Mode mode, Axis2 layou
   node->layout.direction           = layout_direction;
   node->layout.size[Axis2_X]       = size_x;
   node->layout.size[Axis2_Y]       = size_y;
-  node->layout.gap_border[Axis2_X] = 4;
-  node->layout.gap_border[Axis2_Y] = 4;
-  node->layout.gap_child           = 2;
+
+  if (UI_Container_Mode_Box) {
+    node->layout.gap_border[Axis2_X] = 20;
+    node->layout.gap_border[Axis2_Y] = 20;
+    node->layout.gap_child           = 10;
+  }
 
   node->palette.idle  = hsv_u32(200, 10, 10);
   node->palette.hover = hsv_u32(210, 10, 12);
@@ -669,7 +672,7 @@ fn_internal UI_Response ui_button(Str label) {
   node->layout.size[Axis2_X]       = UI_Size_Text;
   node->layout.size[Axis2_Y]       = UI_Size_Text;
   node->layout.gap_border[Axis2_X] = fo_em(node->draw.font, .25f);
-  node->layout.gap_border[Axis2_Y] = fo_em(node->draw.font, .25f);
+  node->layout.gap_border[Axis2_Y] = fo_em(node->draw.font, .1f);
 
   node->palette.idle  = hsv_u32(235, 27, 25);
   node->palette.hover = hsv_u32(235, 24, 44);
@@ -751,8 +754,8 @@ fn_internal UI_Response ui_edit_f32(Str label, F32 *value, F32 step) {
   UI_Node *node = ui_node_push(label, flags);
   node->layout.size[Axis2_X] = UI_Size_Text;
   node->layout.size[Axis2_Y] = UI_Size_Text;
-  node->layout.gap_border[Axis2_X] = .25f * node->draw.font->metric_em;
-  node->layout.gap_border[Axis2_Y] = .25f * node->draw.font->metric_em;
+  node->layout.gap_border[Axis2_X] = 0; // .25f * node->draw.font->metric_em;
+  node->layout.gap_border[Axis2_Y] = 0; // .25f * node->draw.font->metric_em;
 
   node->palette.idle  = hsv_u32(235, 27, 25);
   node->palette.hover = hsv_u32(235, 24, 44);

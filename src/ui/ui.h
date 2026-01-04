@@ -69,10 +69,10 @@ typedef struct UI_Size {
 typedef struct UI_Layout {
   Axis2   direction;
   UI_Size size        [Axis2_Count];
-  I32     gap_border  [Axis2_Count];
-  I32     gap_child;
+  F32     gap_border  [Axis2_Count];
+  F32     gap_child;
 
-  I32     float_position[Axis2_Count];
+  F32     float_position[Axis2_Count];
 } UI_Layout;
 
 typedef struct UI_Color_Palette {
@@ -89,7 +89,7 @@ typedef UI_DRAW_CONTENT_HOOK(UI_Draw_Content_Hook);
 
 typedef struct UI_Draw {
   FO_Font              *font;
-  I32                   inner_fill_border;
+  F32                   inner_fill_border;
 
   UI_Draw_Content_Hook *content_hook;
   void                 *content_user_data;
