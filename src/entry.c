@@ -197,7 +197,7 @@ fn_internal void draw_viewport(UI_Response *response, R2F draw_region, void *use
     .clip_region       = pixel_draw_region,
   };
 
-  // r_command_push_draw(&draw_grid);
+  r_command_push_draw(&draw_grid);
 
 
   if (loaded_model) {
@@ -405,7 +405,7 @@ fn_internal void next_frame(B32 first_frame, PL_Render_Context *render_context) 
 
   ui_frame_end();
 
-  if (pl_input()->keyboard.state[PL_KB_F1]) {
+  if (pl_input()->keyboard.state[PL_KB_F]) {
     g2_clip_region(G2_Clip_None);
 
     fps_ring[fps_at] = f32_div_safe(1, pl_display()->frame_delta);
@@ -424,7 +424,6 @@ fn_internal void next_frame(B32 first_frame, PL_Render_Context *render_context) 
     For_U32(it, sarray_len(fps_ring)) {
       g2_draw_rect(v2f(offset * it, 0), v2f(1.f, (fps_ring[it] / fps_max) * 300.f));
     }
-
 
     fps_avg /= sarray_len(fps_ring);
 

@@ -69,7 +69,7 @@ fi
 
 compiler_flags+=" -fno-builtin-strlen"
 
-
+compiler_flags+=" -std=c23"
 compiler_flags+=" --target=wasm32"
 compiler_flags+=" -ffreestanding"
 compiler_flags+=" -nostdlib"
