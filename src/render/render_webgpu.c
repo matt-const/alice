@@ -6,7 +6,8 @@
 
 R_Shader  R_Shader_Flat_2D        = { };
 R_Shader  R_Shader_Flat_3D        = { };
-R_Shader  R_Shader_MTSDF_2D       = { };
+R_Shader  R_Shader_DVR_3D         = { };
+
 R_Texture R_Texture_White         = { };
 R_Sampler R_Sampler_Linear_Clamp  = { };
 R_Sampler R_Sampler_Nearest_Clamp = { };
@@ -64,6 +65,14 @@ var_global Str webgpu_shader_source_grid_3D = {
   .txt = webgpu_shader_source_grid_3D_dat,
 };
 
+var_global U08 webgpu_shader_source_dvr_3D_dat[] = {
+#embed "dvr_3D.wgsl"
+};
+
+var_global Str webgpu_shader_source_dvr_3D = {
+  .len = sizeof(webgpu_shader_source_dvr_3D_dat),
+  .txt = webgpu_shader_source_dvr_3D_dat,
+};
 
 
 // ------------------------------------------------------------
@@ -124,6 +133,7 @@ fn_internal void webgpu_create_default_shaders(void) {
   R_Shader_Flat_2D = js_webgpu_shader_create((U32)webgpu_shader_source_flat_2D.len, webgpu_shader_source_flat_2D.txt);
   R_Shader_Flat_3D = js_webgpu_shader_create((U32)webgpu_shader_source_flat_3D.len, webgpu_shader_source_flat_3D.txt);
   R_Shader_Grid_3D = js_webgpu_shader_create((U32)webgpu_shader_source_grid_3D.len, webgpu_shader_source_grid_3D.txt);
+  R_Shader_DVR_3D  = js_webgpu_shader_create((U32)webgpu_shader_source_dvr_3D.len,  webgpu_shader_source_dvr_3D.txt);
 }
 
 fn_internal void webgpu_create_default_textures(void) {
@@ -141,7 +151,7 @@ fn_internal void webgpu_create_default_samplers(void) {
   R_Sampler_Nearest_Clamp = r_sampler_create(R_Sampler_Filter_Nearest, R_Sampler_Filter_Nearest);
 }
 
-fn_internal void r_init(Platform_Render_Context *render_context) {
+fn_internal void r_init(PL_Render_Context *render_context) {
   webgpu_create_default_shaders();
   webgpu_create_default_textures();
   webgpu_create_default_samplers();

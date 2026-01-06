@@ -5,12 +5,12 @@
 // #-- Global State
 volatile var_global  B32                   MacOS_Exit_Application = 0;
 volatile var_global  B32                   MacOS_Frame_Started    = 0;
-var_global           Platform_Frame_State  MacOS_Frame_State      = { };
+var_global           PL_Frame_State  MacOS_Frame_State      = { };
 
 typedef struct MacOS_Render_Thread_Data {
   id<MTLDevice>              metal_device;
   CAMetalLayer              *metal_layer;
-  Platform_Next_Frame_Hook  *next_frame;
+  PL_Next_Frame_Hook  *next_frame;
 } MacOS_Render_Thread_Data;
 
 // ------------------------------------------------------------
@@ -24,8 +24,8 @@ typedef struct MacOS_Render_Thread_Data {
 // ------------------------------------------------------------
 // #-- Entry Point
 
-fn_internal Platform_Bootstrap macos_default_bootstrap(void) {
-  Platform_Bootstrap boot = {
+fn_internal PL_Bootstrap macos_default_bootstrap(void) {
+  PL_Bootstrap boot = {
     .title        = str_lit("Alice Engine"),
     .next_frame   = 0,
     .render       = {
@@ -36,15 +36,15 @@ fn_internal Platform_Bootstrap macos_default_bootstrap(void) {
   return boot;
 }
 
-fn_internal Platform_Frame_State *platform_frame_state(void) {
-  Assert(atomic_read_i32(&MacOS_Frame_Started) == 1, "calling platform_frame_state before any frame has started");
+fn_internal PL_Frame_State *pl_frame_state(void) {
+  Assert(atomic_read_i32(&MacOS_Frame_Started) == 1, "calling pl_frame_state before any frame has started");
   return &MacOS_Frame_State;
 }
 
 // ------------------------------------------------------------
 // #-- Frame State
 
-fn_internal void macos_update_input(Platform_Input *input) {
+fn_internal void macos_update_input(PL_Input *input) {
   // NOTE(cmat): Mouse position.
   NSWindow *window       = [NSApp keyWindow];
   NSView   *view         = [window contentView];
@@ -67,7 +67,7 @@ fn_internal void macos_update_input(Platform_Input *input) {
   input->mouse.middle.down              = (mouse_buttons & (1 << 2));
 }
 
-fn_internal void macos_update_frame_state(Platform_Frame_State *state, MacOS_Render_Thread_Data *macos_render_context) {
+fn_internal void macos_update_frame_state(PL_Frame_State *state, MacOS_Render_Thread_Data *macos_render_context) {
   state->display.frame_index += 1;
   state->display.frame_delta = 1.f / 60.f;
   state->display.resolution = (V2F) {
@@ -102,8 +102,8 @@ fn_internal CVReturn macos_display_link_hook( CVDisplayLinkRef    display_link,
   if (!quit) {
       MacOS_Render_Thread_Data *macos_render_context = (MacOS_Render_Thread_Data *)user_data;
 
-      Platform_Render_Context render_context = {
-        .backend      = Platform_Render_Backend_Metal,
+      PL_Render_Context render_context = {
+        .backend      = PL_Render_Backend_Metal,
         .metal_device = (U08 *)macos_render_context->metal_device,
         .metal_layer  = (U08 *)macos_render_context->metal_layer,
       };
@@ -121,8 +121,8 @@ fn_internal CVReturn macos_display_link_hook( CVDisplayLinkRef    display_link,
 
 
 fn_internal void base_entry_point(Array_Str command_line) {
-  Platform_Bootstrap boot = macos_default_bootstrap();
-  platform_entry_point(command_line, &boot);
+  PL_Bootstrap boot = macos_default_bootstrap();
+  pl_entry_point(command_line, &boot);
     
   // NOTE(cmat): Use the bootstrap configuration to setup
   // the window render event loop. If next_frame is 0, we

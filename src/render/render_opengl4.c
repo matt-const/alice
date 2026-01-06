@@ -27,9 +27,9 @@ var_global PFNGLGETPROGRAMINFOLOGPROC  glGetProgramInfoLog;
 fn_internal void *ogl4_load_proc(char *proc_name) {
   void *ptr = (void *)glXGetProcAddress((const GLubyte *)proc_name);
   if (!ptr) {
-    // TODO(cmat): core_panic should be able to format strings? Or that's for logging only?
+    // TODO(cmat): co_panic should be able to format strings? Or that's for logging only?
     log_fatal("failed to load OpenGL4 proc '%s'", proc_name);
-    core_panic(str_lit("failed to load OpenGL4 proc"));
+    co_panic(str_lit("failed to load OpenGL4 proc"));
   }
 
   return ptr;
@@ -197,7 +197,7 @@ fn_internal GLuint ogl4_compile_shader(char *source, GLenum type) {
       log_info("Full shader source:\n%s\n", source);
     }
 
-    core_panic(str_lit("OpenGL4: Failed to compile shader, can't continue."));
+    co_panic(str_lit("OpenGL4: Failed to compile shader, can't continue."));
   }
 
   return shader;
@@ -223,7 +223,7 @@ fn_internal GLuint ogl4_create_program(char *vertex_source, char *fragment_sourc
       log_fatal("OpenGL4: Program link error.\n%s", log_buffer);
     }
 
-    core_panic(str_lit("OpenGL4: Failed to link program, can't continue."));
+    co_panic(str_lit("OpenGL4: Failed to link program, can't continue."));
   }
 
   glDetachShader(program, vertex_shader);
@@ -248,7 +248,7 @@ fn_internal void ogl4_create_default_shaders(void) {
   R_Shader_MTSDF_2D            = (R_Shader) { .id = OGL4_State.shader_last_id };
 }
 
-fn_internal void r_init(Platform_Render_Context *render_context) {
+fn_internal void r_init(PL_Render_Context *render_context) {
   ogl4_load_api();
 
   // NOTE(cmat): Create default resources.

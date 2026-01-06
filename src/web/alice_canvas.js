@@ -1,6 +1,106 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
+// NOTE(cmat): Keycode to scancode map.
+const Keyboard_Typed_Buffer_Len = 64;
+const Keyboard_Typed_Buffer_At  = 0;
+
+const Keyboard_Code_Map = {
+  ShiftLeft:     0,
+  ShiftRight:    1,
+  ControlLeft:   2,
+  ControlRight:  3,
+  AltLeft:       4,
+  AltRight:      5,
+  MetaLeft:      6,
+  MetaRight:     7,
+  CapsLock:      8,
+  NumLock:       9,
+  ScrollLock:    10,
+
+  Enter:         11,
+  Escape:        12,
+  Backspace:     13,
+  Tab:           14,
+  Space:         15,
+
+  KeyA:          16,
+  KeyB:          17,
+  KeyC:          18,
+  KeyD:          19,
+  KeyE:          20,
+  KeyF:          21,
+  KeyG:          22,
+  KeyH:          23,
+  KeyI:          24,
+  KeyJ:          25,
+  KeyK:          26,
+  KeyL:          27,
+  KeyM:          28,
+  KeyN:          29,
+  KeyO:          30,
+  KeyP:          31,
+  KeyQ:          32,
+  KeyR:          33,
+  KeyS:          34,
+  KeyT:          35,
+  KeyU:          36,
+  KeyV:          37,
+  KeyW:          38,
+  KeyX:          39,
+  KeyY:          40,
+  KeyZ:          41,
+
+  Digit0:        42,
+  Digit1:        43,
+  Digit2:        44,
+  Digit3:        45,
+  Digit4:        46,
+  Digit5:        47,
+  Digit6:        48,
+  Digit7:        49,
+  Digit8:        50,
+  Digit9:        51,
+
+  Minus:         52,
+  Equal:         53,
+  BracketLeft:   54,
+  BracketRight:  55,
+  Backslash:     56,
+  Semicolon:     57,
+  Quote:         58,
+  Backquote:     59,
+  Comma:         60,
+  Period:        61,
+  Slash:         62,
+
+  ArrowLeft:     63,
+  ArrowRight:    64,
+  ArrowUp:       65,
+  ArrowDown:     66,
+  Home:          67,
+  End:           68,
+  PageUp:        69,
+  PageDown:      70,
+  Insert:        71,
+  Delete:        72,
+
+  F1:            73,
+  F2:            74,
+  F3:            75,
+  F4:            76,
+  F5:            77,
+  F6:            78,
+  F7:            79,
+  F8:            80,
+  F9:            81,
+  F10:           82,
+  F11:           83,
+  F12:           84,
+
+  Count:         85
+};
+
 // document.body.style.cursor = "crosshair";
 const MSAA_Sample_Count = 4;
 
@@ -22,7 +122,13 @@ const wasm_context = {
         position:   { x: 0, y: 0, },
         scroll_dt:  { x: 0, y: 0, },
         button:     { left: 0, right: 0, middle: 0, },
-      }
+      },
+
+      keyboard: {
+        // TODO(cmat): Pack this into bits instead of a Uint8Array.
+        state: new Uint8Array(Keyboard_Code_Map.Count),
+        typed: new Uint8Array(Keyboard_Typed_Buffer_Len),
+      },
     }
   },
 
@@ -47,13 +153,13 @@ function js_string_from_c_string(string_len, string_txt) {
 // ------------------------------------------------------------
 // #-- NOTE(cmat): JS - WASM core API.
 
-function js_core_unix_time() {
+function js_co_unix_time() {
   const date = new Date();
   const local_offset = date.getTimezoneOffset() * 60 * 1000;
   return Date.now() - local_offset;
 }
 
-function js_core_stream_write(stream_mode, string_len, string_txt) {
+function js_co_stream_write(stream_mode, string_len, string_txt) {
   const js_string = js_string_from_c_string(string_len, string_txt);
 
   if (stream_mode == 1) {
@@ -63,7 +169,7 @@ function js_core_stream_write(stream_mode, string_len, string_txt) {
   }
 }
 
-function js_core_panic(string_len, string_txt) {
+function js_co_panic(string_len, string_txt) {
   const js_string = js_string_from_c_string(string_len, string_txt);
   alert(js_string);
   throw "PANIC ## " + js_string;
@@ -137,7 +243,7 @@ function js_http_request_send(request_ptr, arena_ptr, url_len, url_txt) {
 // ------------------------------------------------------------
 // #-- NOTE(cmat): JS - WASM platform API.
 
-function js_platform_set_shared_memory(frame_state_address) {
+function js_pl_set_shared_memory(frame_state_address) {
   wasm_context.shared_memory.frame_state = frame_state_address
 }
 
@@ -183,7 +289,6 @@ async function webgpu_init(canvas) {
   }
 
   const webgpu_device  = await webgpu_adapter.requestDevice();
-
   const webgpu_context = wasm_context.canvas.getContext("webgpu");
   const webgpu_format  = navigator.gpu.getPreferredCanvasFormat();
 
@@ -363,7 +468,7 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr, depth_buffe
 
           {
             binding: 2,
-            visibility: GPUShaderStage.VERTEX,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
             buffer: { type: 'uniform' },
           }
         ]
@@ -428,8 +533,10 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr, depth_buffe
       ]
     },
 
-    primitive: { topology: 'triangle-list' },
-    cullMode: 'back',
+    primitive: { 
+      topology: 'triangle-list',
+      cullMode: 'back',
+    },
 
     depthStencil: depth_stencil,
     multisample: { count: MSAA_Sample_Count, },
@@ -523,7 +630,7 @@ function js_webgpu_frame_flush(draw_command_ptr) {
 }
 
 function wasm_pack_frame_state(frame_state) {
-  const buffer_view = new DataView(wasm_context.memory.buffer, wasm_context.shared_memory.frame_state, 10 * 4);
+  const buffer_view = new DataView(wasm_context.memory.buffer, wasm_context.shared_memory.frame_state, 10 * 4 + Keyboard_Code_Map.Count * 1);
   
   let offset = 0;
   buffer_view.setUint32   (offset, frame_state.display.resolution.width,  true); offset += 4;
@@ -536,6 +643,10 @@ function wasm_pack_frame_state(frame_state) {
   buffer_view.setUint32   (offset, frame_state.input.mouse.button.left,   true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.input.mouse.button.right,  true); offset += 4;
   buffer_view.setUint32   (offset, frame_state.input.mouse.button.middle, true); offset += 4;
+
+  for (let it = 0; it < Keyboard_Code_Map.Count; it++) {
+    buffer_view.setUint8(offset, frame_state.input.keyboard.state[it], true); offset += 1;
+  }
 
   return buffer_view;
 }
@@ -601,15 +712,15 @@ function wasm_module_load(wasm_bytecode) {
       memory: memory,
 
       // NOTE(cmat): Core API.
-      js_core_stream_write:           js_core_stream_write,
-      js_core_unix_time:              js_core_unix_time,
-      js_core_panic:                  js_core_panic,
+      js_co_stream_write:           js_co_stream_write,
+      js_co_unix_time:              js_co_unix_time,
+      js_co_panic:                  js_co_panic,
 
       // NOTE(cmat): HTTP API.
       js_http_request_send:           js_http_request_send,
 
       // NOTE(cmat): Platform API.
-      js_platform_set_shared_memory:  js_platform_set_shared_memory,
+      js_pl_set_shared_memory:  js_pl_set_shared_memory,
 
       // NOTE(cmat): WebGPU API.
       js_webgpu_buffer_allocate:      js_webgpu_buffer_allocate,
@@ -696,6 +807,15 @@ function wasm_module_load(wasm_bytecode) {
         wasm_context.frame_state.input.mouse.scroll_dt.y += e.deltaY;
         e.preventDefault();
       }, { passive: false });
+
+      window.addEventListener('keydown', e => {
+        wasm_context.frame_state.input.keyboard.state[Keyboard_Code_Map[e.code]] = 1;
+      });
+
+      window.addEventListener('keyup', e => {
+        wasm_context.frame_state.input.keyboard.state[Keyboard_Code_Map[e.code]] = 0;
+      });
+      
 
       // NOTE(cmat): Disable context menu on canvas.
       wasm_context.canvas.addEventListener('contextmenu', e => e.preventDefault());

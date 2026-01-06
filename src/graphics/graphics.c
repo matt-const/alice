@@ -66,7 +66,7 @@ fn_internal void g2_submit_draw(void) {
   if (G2_State.buffer.draw_index_count) {
 
     // TODO(cmat): Move out some parts.
-    V2F display_size = platform_display()->resolution;
+    V2F display_size = pl_display()->resolution;
     r_buffer_download(G2_State.constant_viewport_2D,
                         0, sizeof(R_Constant_Buffer_Viewport_2D),
                         &(R_Constant_Buffer_Viewport_2D) {
@@ -80,14 +80,14 @@ fn_internal void g2_submit_draw(void) {
                           .e34 =  0 }
                         });
 
-    V2F resolution = platform_display()->resolution;
+    V2F resolution = pl_display()->resolution;
 
     R2I clip_region = G2_State.last_clip_region;
 
     clip_region.x0 = i32_max(0, clip_region.x0);
     clip_region.y0 = i32_max(0, clip_region.y0);
-    clip_region.x1 = i32_min((I32)platform_display()->resolution.x, clip_region.x1);
-    clip_region.y1 = i32_min((I32)platform_display()->resolution.y, clip_region.y1);
+    clip_region.x1 = i32_min((I32)pl_display()->resolution.x, clip_region.x1);
+    clip_region.y1 = i32_min((I32)pl_display()->resolution.y, clip_region.y1);
 
     R_Command_Draw draw = {
         .constant_buffer       = G2_State.constant_viewport_2D,
@@ -102,7 +102,7 @@ fn_internal void g2_submit_draw(void) {
 
         .depth_test            = 0,
 
-        .draw_region           = platform_display_region(),
+        .draw_region           = pl_display_region(),
         .clip_region           = clip_region,
     };
 

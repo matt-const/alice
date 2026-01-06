@@ -71,6 +71,8 @@ R_Buffer    model_vertex_buffer;
 U32         model_index_count;
 R_Pipeline  model_pipeline;
 
+R_Texture   transfer_texture;
+
 typedef struct Camera {
   V3F look_at;
   F32 radius_m;
@@ -88,7 +90,8 @@ typedef struct Camera {
   B32 orthographic;
   F32 orthographic_t;
 
-  F32 aspect_ratio;
+  F32 computed_aspect_ratio;
+  V3F computed_position_m;
 } Camera;
 
 var_global Camera camera = {
@@ -96,49 +99,47 @@ var_global Camera camera = {
   .radius_m     = 10.f,
   .theta_deg    = 45.f,
   .phi_deg      = 45.f,
-  .near_m       = 1.f,
+  .near_m       = 0.5f,
   .far_m        = 5000.f,
   .fov_deg      = 60.f,
   .orthographic = 0,
 };
 
 fn_internal M4F camera_view(Camera *camera) {
-  F32 theta_rad = f32_radians_from_degrees(camera->theta_deg_t);
-  F32 phi_rad   = f32_radians_from_degrees(camera->phi_deg_t);
-
-  V3F position = v3f_mul(camera->radius_m_t, v3f(f32_cos(theta_rad) * f32_sin(phi_rad),
-                                                 f32_cos(phi_rad),
-                                                 f32_sin(theta_rad) * f32_sin(phi_rad)));
-
-  M4F view = m4f_hom_look_at(v3f(0, 1, 0), position, camera->look_at);
+  M4F view = m4f_hom_look_at(v3f(0, 1, 0), camera->computed_position_m, camera->look_at);
   return view;
 }
 
 fn_internal void camera_update(Camera *camera, R2F draw_region) {
-  F32 frame_delta = platform_display()->frame_delta;
+  F32 frame_delta = pl_display()->frame_delta;
   
-  camera->aspect_ratio = (draw_region.x1 - draw_region.x0) / (draw_region.y1 - draw_region.y0);
-
   camera->radius_m = f32_clamp(camera->radius_m, 3.f, 50.f);
   camera->phi_deg  = f32_clamp(camera->phi_deg,  0.01f, 179.99f);
 
-  camera->radius_m_t      = f32_exp_smoothing(camera->radius_m_t,     camera->radius_m,     frame_delta * 15.f);
-  camera->theta_deg_t     = f32_exp_smoothing(camera->theta_deg_t,    camera->theta_deg,    frame_delta * 15.f);
-  camera->phi_deg_t       = f32_exp_smoothing(camera->phi_deg_t,      camera->phi_deg,      frame_delta * 15.f);
+  camera->radius_m_t  = f32_exp_smoothing(camera->radius_m_t,     camera->radius_m,     frame_delta * 15.f);
+  camera->theta_deg_t = f32_exp_smoothing(camera->theta_deg_t,    camera->theta_deg,    frame_delta * 15.f);
+  camera->phi_deg_t   = f32_exp_smoothing(camera->phi_deg_t,      camera->phi_deg,      frame_delta * 15.f);
 
   camera->orthographic_t  = f32_exp_smoothing(camera->orthographic_t, camera->orthographic, frame_delta * 15.f);
+
+  F32 theta_rad = f32_radians_from_degrees(camera->theta_deg_t);
+  F32 phi_rad   = f32_radians_from_degrees(camera->phi_deg_t);
+
+  camera->computed_aspect_ratio = (draw_region.x1 - draw_region.x0) / (draw_region.y1 - draw_region.y0);
+  camera->computed_position_m = v3f_mul(camera->radius_m_t, v3f(f32_cos(theta_rad) * f32_sin(phi_rad),
+                                        f32_cos(phi_rad),
+                                        f32_sin(theta_rad) * f32_sin(phi_rad)));
+
 }
 
 fn_internal M4F camera_projection(Camera *camera) {
   F32 fov_rad = f32_radians_from_degrees(camera->fov_deg);
 
   M4F projection = { };
-
-
-  M4F perspective = m4f_hom_perspective(camera->aspect_ratio, fov_rad, camera->near_m, camera->far_m);
+  M4F perspective = m4f_hom_perspective(camera->computed_aspect_ratio, fov_rad, camera->near_m, camera->far_m);
  
   F32 h        = 2.f * camera->radius_m_t * f32_tan(.5f * fov_rad);
-  F32 w        = h * camera->aspect_ratio;
+  F32 w        = h * camera->computed_aspect_ratio;
 
   V2F bottom_left = v2f(-.5f * w, -.5f * h);
   V2F top_right   = v2f(+.5f * w, +.5f * h);
@@ -155,21 +156,22 @@ fn_internal void draw_viewport(UI_Response *response, R2F draw_region, void *use
   g2_draw_rect(position, size, .color = v4f(.2f, .2f, .3f, 1));
   g2_submit_draw();
 
-  if (platform_input()->mouse.left.down) {
-    camera.theta_deg += 10.f * platform_display()->frame_delta * platform_input()->mouse.position_dt.x;
-    camera.phi_deg   += 10.f * platform_display()->frame_delta * platform_input()->mouse.position_dt.y;
+  if (response->down) {
+    camera.theta_deg += 10.f * pl_display()->frame_delta * pl_input()->mouse.position_dt.x;
+    camera.phi_deg   += 10.f * pl_display()->frame_delta * pl_input()->mouse.position_dt.y;
   }
 
-  camera.radius_m += platform_input()->mouse.scroll_dt.y * .025f;
+  camera.radius_m += pl_input()->mouse.scroll_dt.y * .025f;
 
   camera_update(&camera, draw_region);
+
   M4F view = camera_view(&camera);
   M4F projection = camera_projection(&camera);
   M4F world_view_projection = m4f_mul(view, projection);
 
   R_Constant_Buffer_World_3D test_world = {
     .World_View_Projection = world_view_projection,
-    .Eye_Position          = v3f(0, 0, 0),
+    .Eye_Position          = camera.computed_position_m,
   };
 
   world_buffer = r_buffer_allocate(sizeof(R_Constant_Buffer_World_3D), R_Buffer_Mode_Static);
@@ -178,27 +180,7 @@ fn_internal void draw_viewport(UI_Response *response, R2F draw_region, void *use
 #if 1
 
   R2I pixel_draw_region = r2i(draw_region.x0, draw_region.y0, draw_region.x1, draw_region.y1);
-
-  if (loaded_model) {
-    R_Command_Draw draw_model = {
-      .constant_buffer  = world_buffer,
-      .vertex_buffer    = model_vertex_buffer,
-      .index_buffer     = model_index_buffer,
-      .pipeline         = model_pipeline,
-      .texture          = R_Texture_White,
-      .sampler          = R_Sampler_Linear_Clamp,
-
-      .draw_index_count  = model_index_count,
-      .draw_index_offset = 0,
-
-      .depth_test        = 1,
-      .draw_region       = pixel_draw_region,
-      .clip_region       = pixel_draw_region,
-    };
-
-    r_command_push_draw(&draw_model);
-  }
-
+ 
   R_Command_Draw draw_grid = {
     .constant_buffer  = world_buffer,
     .vertex_buffer    = vertex_buffer,
@@ -215,11 +197,34 @@ fn_internal void draw_viewport(UI_Response *response, R2F draw_region, void *use
     .clip_region       = pixel_draw_region,
   };
 
-  r_command_push_draw(&draw_grid);
+  // r_command_push_draw(&draw_grid);
+
+
+  if (loaded_model) {
+    R_Command_Draw draw_model = {
+      .constant_buffer  = world_buffer,
+      .vertex_buffer    = model_vertex_buffer,
+      .index_buffer     = model_index_buffer,
+      .pipeline         = model_pipeline,
+      .texture          = transfer_texture,
+      .sampler          = R_Sampler_Linear_Clamp,
+
+      .draw_index_count  = model_index_count,
+      .draw_index_offset = 0,
+
+      .depth_test        = 1,
+      .draw_region       = pixel_draw_region,
+      .clip_region       = pixel_draw_region,
+    };
+
+    r_command_push_draw(&draw_model);
+  }
+
+
 #endif
 }
 
-fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_context) {
+fn_internal void next_frame(B32 first_frame, PL_Render_Context *render_context) {
   If_Unlikely(first_frame) {
     r_init(render_context);
     g2_init();
@@ -237,18 +242,28 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       codepoint_from_utf8(str_lit(ICON_FA_CAMERA_RETRO), 0),
     };
 
+    // TODO(cmat): Should update dynamically with display resize.
+    U32 font_size = 0;
+    if (pl_display()->resolution.y <= 1080) {
+      font_size = 20;
+    } else if (pl_display()->resolution.y <= 1400) {
+      font_size = 26;
+    } else {
+      font_size = 32;
+    }
+
     fo_font_init(&UI_Font_Text, &Permanent_Storage,
                  str(figtree_regular_ttf_len, figtree_regular_ttf),
-                 26, v2_u16(512, 512), Codepoints_ASCII);
+                 font_size, v2_u16(512, 512), Codepoints_ASCII);
 
     fo_font_init(&UI_Font_Icon, &Permanent_Storage,
                  str(Font_Awesome_7_Free_Solid_900_otf_len, Font_Awesome_7_Free_Solid_900_otf),
-                 26, v2_u16(512, 512), array_from_sarray(Array_Codepoint, icon_codepoints));
+                 font_size, v2_u16(512, 512), array_from_sarray(Array_Codepoint, icon_codepoints));
 
     ui_init(&UI_Font_Text);
 
     arena_init(&request_arena);
-    http_request_send(&request, &request_arena, str_lit("test.stl"));
+    http_request_send(&request, &request_arena, str_lit("cube.stl"));
 
     F32 scale = 1000.0f;
     F32 vmin = -1.f * scale;
@@ -261,16 +276,31 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       { .X = v3f(vmin, 0, vmax), .U = v2f(0.f, scale),    .C = abgr_u32_from_rgba_premul(v4f(1.f, 1.f, 1.f, 1.f)), },
     };
 
-    U32 test_indices[] = { 0, 1, 2, 0, 2, 3 };
+    U32 test_indices[] = { 0, 2, 1, 0, 3, 2 };
 
     pipeline       = r_pipeline_create(R_Shader_Grid_3D, &R_Vertex_Format_XUC_3D, 1);
-    model_pipeline = r_pipeline_create(R_Shader_Flat_3D, &R_Vertex_Format_XUC_3D, 1);
+    model_pipeline = r_pipeline_create(R_Shader_DVR_3D,  &R_Vertex_Format_XUC_3D, 1);
 
     vertex_buffer = r_buffer_allocate(sizeof(test_vertices), R_Buffer_Mode_Static);
     r_buffer_download(vertex_buffer, 0, sizeof(test_vertices), test_vertices);
 
     index_buffer = r_buffer_allocate(sizeof(test_indices), R_Buffer_Mode_Static);
     r_buffer_download(index_buffer, 0, sizeof(test_indices), test_indices);
+
+    U32 texture_width = 256;
+    U08 *texture_data = arena_push_size(&request_arena, 4 * texture_width);
+    For_U32 (it, texture_width) {
+      F32 t = (F32)it / (texture_width - 1);
+      V3F c = rgb_from_hsv(v3f(t, 1.0f, 1.0f));
+
+      texture_data[4 * it + 0] = 255 * c.r;
+      texture_data[4 * it + 1] = 255 * c.g;
+      texture_data[4 * it + 2] = 255 * c.b;
+      texture_data[4 * it + 3] = t;
+    }
+
+    transfer_texture = r_texture_allocate(R_Texture_Format_RGBA_U08_Normalized, 256, 1);
+    r_texture_download(transfer_texture, R_Texture_Format_RGBA_U08_Normalized, r2i(0, 0, 256, 1), texture_data);
   }
 
   if (!loaded_model && request.status == HTTP_Status_Done) {
@@ -295,9 +325,9 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
 
   ui_frame_begin();
 
-  if (platform_input()->mouse.right.down_first_frame) {
+  if (pl_input()->mouse.right.down_first_frame) {
     context_menu = 1;
-    context_menu_at = v2f(platform_input()->mouse.position.x, platform_display()->resolution.y - platform_input()->mouse.position.y);
+    context_menu_at = v2f(pl_input()->mouse.position.x, pl_display()->resolution.y - pl_input()->mouse.position.y);
   }
 
   if (context_menu) {
@@ -321,18 +351,13 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     }
   }
  
-  if (context_menu && platform_input()->mouse.left.down_first_frame) {
+  if (context_menu && pl_input()->mouse.left.down_first_frame) {
     context_menu = 0;
   }
 
   UI_Node *workspace = ui_container(str_lit("workspace"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fill);
-  workspace->palette.idle = v3f(.8f, .8f, .8f);
-  workspace->palette.hover = v3f(.7f, .6f, .8f);
   UI_Parent_Scope(workspace) {
     UI_Node *layers = ui_container(str_lit("layers"), UI_Container_Mode_Box, Axis2_Y, UI_Size_Fixed(400), UI_Size_Fill);
-    layers->palette.idle = v3f(.5f, .8f, .9f);
-    layers->palette.hover = v3f(.4f, .6f, .9f);
-
     UI_Parent_Scope(layers) {
 
       UI_Parent_Scope(ui_container(str_lit("menu_bar"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fit)) {
@@ -352,7 +377,7 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
       UI_Node *entry_1 = ui_container(str_lit("entry_1"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fit);
       UI_Parent_Scope(entry_1) {
         UI_Font_Scope(&UI_Font_Icon) { ui_label(str_lit(ICON_FA_CUBE)); }
-        ui_label(str_lit("Terrain"));
+        ui_label(str_lit("Volumetric Data"));
         ui_container(str_lit("center_padding"), UI_Container_Mode_None, Axis2_X, UI_Size_Fill, UI_Size_Fit);
         UI_Font_Scope(&UI_Font_Icon) { ui_button(str_lit(ICON_FA_EYE)); }
       }
@@ -360,8 +385,6 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
     }
 
     UI_Node *viewport = ui_container(str_lit("viewport"), UI_Container_Mode_Box, Axis2_Y, UI_Size_Fill, UI_Size_Fill);
-    viewport->palette.idle = v3f(.1f, .8f, .9f);
-    viewport->palette.hover = v3f(.0f, .6f, .9f);
 
     UI_Parent_Scope(viewport) {
       UI_Parent_Scope(ui_container(str_lit("menu_bar"), UI_Container_Mode_Box, Axis2_X, UI_Size_Fill, UI_Size_Fit)) {
@@ -380,55 +403,55 @@ fn_internal void next_frame(B32 first_frame, Platform_Render_Context *render_con
 
   }
 
-
-#if 0
-  g2_clip_region(G2_Clip_None);
-
-  fps_ring[fps_at] = f32_div_safe(1, platform_display()->frame_delta);
-  fps_at = (fps_at + 1) % sarray_len(fps_ring);
-
-  F32 fps_avg = 0;
-  F32 fps_max = 0;
-  For_U32(it, sarray_len(fps_ring)) {
-    fps_avg += fps_ring[it];
-    fps_max = f32_max(fps_ring[it], fps_max);
-  }
-
-  F32 bar_w  = 2.f;
-  F32 bar_s  = 1.f;
-  F32 offset = (bar_w + bar_s);
-  For_U32(it, sarray_len(fps_ring)) {
-    g2_draw_rect(v2f(offset * it, 0), v2f(1.f, (fps_ring[it] / fps_max) * 300.f));
-  }
-
-
-  fps_avg /= sarray_len(fps_ring);
-
-  char buffer[512];
-  stbsp_snprintf(buffer, 512, "%.2f", fps_avg);
-
-  g2_draw_text(str_from_cstr(buffer), &UI_Font_Text, v2f(10, 300));
-#endif
-
   ui_frame_end();
+
+  if (pl_input()->keyboard.state[PL_KB_F1]) {
+    g2_clip_region(G2_Clip_None);
+
+    fps_ring[fps_at] = f32_div_safe(1, pl_display()->frame_delta);
+    fps_at = (fps_at + 1) % sarray_len(fps_ring);
+
+    F32 fps_avg = 0;
+    F32 fps_max = 0;
+    For_U32(it, sarray_len(fps_ring)) {
+      fps_avg += fps_ring[it];
+      fps_max = f32_max(fps_ring[it], fps_max);
+    }
+
+    F32 bar_w  = 2.f;
+    F32 bar_s  = 1.f;
+    F32 offset = (bar_w + bar_s);
+    For_U32(it, sarray_len(fps_ring)) {
+      g2_draw_rect(v2f(offset * it, 0), v2f(1.f, (fps_ring[it] / fps_max) * 300.f));
+    }
+
+
+    fps_avg /= sarray_len(fps_ring);
+
+    char buffer[512];
+    stbsp_snprintf(buffer, 512, "%.2f", fps_avg);
+
+    g2_draw_text(str_from_cstr(buffer), &UI_Font_Text, v2f(10, 300));
+  }
+
   g2_frame_flush();
   r_frame_flush();
 }
 
-fn_internal void log_core_context(void) {
+fn_internal void log_co_context(void) {
   Log_Zone_Scope("hardware info") {
-    log_info("CPU: %.*s",            str_expand(core_context()->cpu_name));
-    log_info("Logical Cores: %llu",  core_context()->cpu_logical_cores);
-    log_info("Page Size: %$$llu",    core_context()->mmu_page_bytes);
-    log_info("RAM Capacity: %$$llu", core_context()->ram_capacity_bytes);
+    log_info("CPU: %.*s",            str_expand(co_context()->cpu_name));
+    log_info("Logical Cores: %llu",  co_context()->cpu_logical_cores);
+    log_info("Page Size: %$$llu",    co_context()->mmu_page_bytes);
+    log_info("RAM Capacity: %$$llu", co_context()->ram_capacity_bytes);
   }
 }
 
-fn_internal void platform_entry_point(Array_Str command_line, Platform_Bootstrap *boot) {
+fn_internal void pl_entry_point(Array_Str command_line, PL_Bootstrap *boot) {
   boot->next_frame = next_frame;
   boot->title = str_lit("Alice Engine");
 
   logger_push_hook(logger_write_entry_standard_stream, logger_format_entry_minimal);
-  log_core_context();
+  log_co_context();
 } 
 

@@ -23,6 +23,9 @@ var_global struct {
   B32           next_overlay;
   UI_Node_List  overlay_list;
 
+  B32           debug_mode;
+  Random_Seed   debug_rng;
+
 } UI_State = { };
 
 #define UI_Font_Scope(font_ptr_) Defer_Scope(ui_font_push(font_ptr_), ui_font_pop())
@@ -165,7 +168,7 @@ fn_internal void ui_node_update_tree(UI_Node *node, UI_Node *parent) {
 fn_internal void ui_node_update_response(UI_Node *node) {
   zero_fill(&node->response);
 
-  V2F mouse  = platform_input()->mouse.position;
+  V2F mouse  = pl_input()->mouse.position;
   R2F region = node->solved.region_absolute;
 
   if (r2f_contains_v2f(region, mouse)) {
@@ -173,8 +176,8 @@ fn_internal void ui_node_update_response(UI_Node *node) {
       node->response.hover = 1;
     }
 
-    if (platform_input()->mouse.left.down) {
-      if (platform_input()->mouse.left.down_first_frame) {
+    if (pl_input()->mouse.left.down) {
+      if (pl_input()->mouse.left.down_first_frame) {
         if (node->flags & UI_Flag_Response_Press) {
           node->response.press = 1;
         }
@@ -190,7 +193,7 @@ fn_internal void ui_node_update_response(UI_Node *node) {
 fn_internal void ui_node_update_animation(UI_Node *node) {
   UI_Animation *anim = &node->animation;
 
-  U32 frame_index = platform_display()->frame_index;
+  U32 frame_index = pl_display()->frame_index;
 
   // NOTE(cmat): If there were skipped frames, that is,
   // the UI component was hidden, we invalidate the animation cache.
@@ -200,7 +203,7 @@ fn_internal void ui_node_update_animation(UI_Node *node) {
 
   node->frame_index = frame_index;
 
-  F32 refresh_rate_coeff = platform_display()->frame_delta;
+  F32 refresh_rate_coeff = pl_display()->frame_delta;
 
   anim->spawn_t = f32_exp_smoothing(anim->spawn_t, 1.f,                  f32_min(1.f, refresh_rate_coeff * 15.f));
   anim->hover_t = f32_exp_smoothing(anim->hover_t, node->response.hover, f32_min(1.f, refresh_rate_coeff * 15.f));
@@ -472,7 +475,7 @@ fn_internal void ui_solve_region(UI_Node *node, V2F position_at) {
   if (node) {
     position_at = v2f_add(position_at, node->solved.position_relative);
 
-    V2F display_resolution = platform_display()->resolution;
+    V2F display_resolution = pl_display()->resolution;
     V2F size               = node->solved.size;
     V2F position_absolute  = v2f(position_at.x, display_resolution.y - position_at.y - node->solved.size.y);
     node->solved.region_absolute = r2f_v(position_absolute, v2f_add(position_absolute, size));
@@ -520,10 +523,17 @@ fn_internal void ui_draw(UI_Node *node, UI_Draw_Context *context) {
     g2_clip_region(clip_region);
 
     if (node->flags & UI_Flag_Draw_Background) {
-      HSV hsv_color = node->palette.idle;
-
-      hsv_color = v3f_lerp(node->animation.hover_t, hsv_color, node->palette.hover);
-      hsv_color = v3f_lerp(node->animation.down_t,  hsv_color, node->palette.down);
+      HSV hsv_color = { };
+      if (!UI_State.debug_mode) {
+        hsv_color = node->palette.idle;
+        hsv_color = v3f_lerp(node->animation.hover_t, hsv_color, node->palette.hover);
+        hsv_color = v3f_lerp(node->animation.down_t,  hsv_color, node->palette.down);
+      } else {
+        F32 random_hue = f32_random_unilateral(&UI_State.debug_rng);
+        hsv_color = v3f(random_hue, .8f, .7f);
+        hsv_color = v3f_lerp(node->animation.hover_t, hsv_color, v3f(random_hue, .9f, .9f));
+        hsv_color = v3f_lerp(node->animation.down_t,  hsv_color, v3f(random_hue, .7f, .5f));
+      }
 
       V4F rgb_color = { 0 };
       rgb_color.rgb = rgb_from_hsv(hsv_color);
@@ -532,7 +542,8 @@ fn_internal void ui_draw(UI_Node *node, UI_Draw_Context *context) {
       V2F position = region.min;
       V2F size     = v2f_sub(region.max, region.min);
 
-      g2_draw_rect(position, size, .color = rgb_color);
+      g2_draw_rect_rounded(position, size, 9.f, .segments = 5, .color = v4f(.3f, .3f, .3f, 1.f));
+      g2_draw_rect_rounded(v2f(position.x + 1, position.y + 1), v2f(size.x - 2, size.y - 2), 7.f, .segments = 5, .color = rgb_color);
     }
 
     if (node->flags & UI_Flag_Draw_Inner_Fill) {
@@ -584,12 +595,15 @@ fn_internal void ui_frame_begin(void) {
   UI_State.root = ui_node_push(UI_Root_Label, UI_Flag_None);
   ui_parent_push(UI_State.root);
 
-  UI_State.root->layout.size[Axis2_X] = UI_Size_Fixed(platform_display()->resolution.x);
-  UI_State.root->layout.size[Axis2_Y] = UI_Size_Fixed(platform_display()->resolution.y);
+  UI_State.root->layout.size[Axis2_X] = UI_Size_Fixed(pl_display()->resolution.x);
+  UI_State.root->layout.size[Axis2_Y] = UI_Size_Fixed(pl_display()->resolution.y);
 
   // NOTE(cmat): Clear overlay list.
   UI_State.overlay_list.first = 0;
   UI_State.overlay_list.last  = 0;
+
+  UI_State.debug_mode = pl_input()->keyboard.state[PL_KB_F2];
+  UI_State.debug_rng = 1234;
 }
 
 fn_internal void ui_frame_end(void) {
@@ -626,6 +640,7 @@ fn_internal UI_Node *ui_container(Str label, UI_Container_Mode mode, Axis2 layou
   switch (mode) {
     case UI_Container_Mode_Box: {
       flags = UI_Flag_Response_Hover  |
+              UI_Flag_Response_Down   |
               UI_Flag_Draw_Background |
               UI_Flag_Draw_Border;
     } break;
@@ -637,14 +652,22 @@ fn_internal UI_Node *ui_container(Str label, UI_Container_Mode mode, Axis2 layou
   node->layout.size[Axis2_Y]       = size_y;
 
   if (mode == UI_Container_Mode_Box) {
-    node->layout.gap_border[Axis2_X] = 20; // 4
-    node->layout.gap_border[Axis2_Y] = 20; // 4
-    node->layout.gap_child           = 10; // 2
+#if 1
+    node->layout.gap_border[Axis2_X] = 4;
+    node->layout.gap_border[Axis2_Y] = 4;
+    node->layout.gap_child           = 2;
+#else
+  node->layout.gap_border[Axis2_X] = 20;
+  node->layout.gap_border[Axis2_Y] = 20;
+  node->layout.gap_child           = 10;
+
+
+#endif
   }
 
-  node->palette.idle  = hsv_u32(200, 10, 10);
-  node->palette.hover = hsv_u32(210, 10, 12);
-  node->palette.down  = hsv_u32(220, 10, 5);
+  node->palette.idle  = hsv_u32(200, 10, 10 + 5);
+  node->palette.hover = hsv_u32(210, 10, 12 + 5);
+  node->palette.down  = hsv_u32(220, 10, 12 + 5);
 
   return node;
 }

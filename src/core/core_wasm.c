@@ -4,45 +4,45 @@
 // ------------------------------------------------------------
 // #-- NOTE(cmat): Unspported in WASM backend.
 
-#define WASM_Not_Supported(proc_) core_panic(str_lit(Macro_Stringize(proc_) ": not supported on WASM backend."));
+#define WASM_Not_Supported(proc_) co_panic(str_lit(Macro_Stringize(proc_) ": not supported on WASM backend."));
 
-fn_internal B32       core_directory_create (Str folder_path)                                     { WASM_Not_Supported(core_directory_create); return 0;            }
-fn_internal B32       core_directory_delete (Str folder_path)                                     { WASM_Not_Supported(core_directory_delete); return 0;            }
-fn_internal Core_File core_file_open        (Str file_path, Core_File_Access_Flag flags)          { WASM_Not_Supported(core_file_open); return (Core_File) { };     }
-fn_internal U64       core_file_size        (Core_File *file)                                     { WASM_Not_Supported(core_file_size); return 0; return 0;         }
-fn_internal void      core_file_write       (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_write);                            }
-fn_internal void      core_file_read        (Core_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(core_file_read);                             }
-fn_internal void      core_file_close       (Core_File *file)                                     { WASM_Not_Supported(core_file_close);                            }
+fn_internal B32       co_directory_create (Str folder_path)                                     { WASM_Not_Supported(co_directory_create); return 0;            }
+fn_internal B32       co_directory_delete (Str folder_path)                                     { WASM_Not_Supported(co_directory_delete); return 0;            }
+fn_internal CO_File co_file_open        (Str file_path, CO_File_Access_Flag flags)          { WASM_Not_Supported(co_file_open); return (CO_File) { };     }
+fn_internal U64       co_file_size        (CO_File *file)                                     { WASM_Not_Supported(co_file_size); return 0; return 0;         }
+fn_internal void      co_file_write       (CO_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(co_file_write);                            }
+fn_internal void      co_file_read        (CO_File *file, U64 offset, U64 bytes, void *data)  { WASM_Not_Supported(co_file_read);                             }
+fn_internal void      co_file_close       (CO_File *file)                                     { WASM_Not_Supported(co_file_close);                            }
 
 // ------------------------------------------------------------
 // #-- JS - WASM core API.
-fn_external void js_core_stream_write  (U32 stream_mode, U32 string_len, char *string_txt);
-fn_external F64  js_core_unix_time     (void);
-fn_external void js_core_panic         (U32 string_len, char *string_txt);
+fn_external void js_co_stream_write  (U32 stream_mode, U32 string_len, char *string_txt);
+fn_external F64  js_co_unix_time     (void);
+fn_external void js_co_panic         (U32 string_len, char *string_txt);
 
-var_global Core_Context wasm_context = { };
-fn_internal Core_Context *core_context(void) {
+var_global CO_Context wasm_context = { };
+fn_internal CO_Context *co_context(void) {
   return &wasm_context;
 }
 
-fn_internal void core_stream_write(Str buffer, Core_Stream stream) {
+fn_internal void co_stream_write(Str buffer, CO_Stream stream) {
   U32 stream_mode = 1;
   switch (stream) {
-    case Core_Stream_Standard_Output: { stream_mode = 1; } break;
-    case Core_Stream_Standard_Error:  { stream_mode = 2; } break;
+    case CO_Stream_Standard_Output: { stream_mode = 1; } break;
+    case CO_Stream_Standard_Error:  { stream_mode = 2; } break;
     Invalid_Default;
   }
   
-  js_core_stream_write(stream_mode, (U32)buffer.len, (char *)buffer.txt);
+  js_co_stream_write(stream_mode, (U32)buffer.len, (char *)buffer.txt);
 }
 
-fn_internal void core_panic(Str reason) {
-  js_core_panic((U32)reason.len, (char *)reason.txt);
+fn_internal void co_panic(Str reason) {
+  js_co_panic((U32)reason.len, (char *)reason.txt);
 }
 
-fn_internal Local_Time core_local_time(void) {
+fn_internal Local_Time co_local_time(void) {
   Local_Time result     = { };
-  U64 time_since_epoch  = (U64)js_core_unix_time();
+  U64 time_since_epoch  = (U64)js_co_unix_time();
   U64 unix_seconds      = time_since_epoch / 1000;
   U64 unix_microseconds = (time_since_epoch % 1000) * 1000;
   Local_Time local_time = local_time_from_unix_time(unix_seconds, unix_microseconds);
@@ -63,12 +63,12 @@ void  free  (void *ptr);
 // - managment primitives, but given how things have been going with the standard...
 // - not holding my breath.
 
-fn_internal U08 *core_memory_reserve(U64 bytes) {
+fn_internal U08 *co_memory_reserve(U64 bytes) {
   U08 *result = (U08 *)malloc(bytes);
   return result;
 }
 
-fn_internal void core_memory_unreserve  (void *virtual_base, U64 bytes) {
+fn_internal void co_memory_unreserve  (void *virtual_base, U64 bytes) {
   // TODO(cmat): This ignores bytes, which is technically fine for the current arena allocator,
   // - but is definitely not fine otherwise.
   // - Maybe the correct solution is to actually just store bytes in any allocation upfront in a header,
@@ -76,8 +76,8 @@ fn_internal void core_memory_unreserve  (void *virtual_base, U64 bytes) {
   free(virtual_base);
 }
 
-fn_internal void core_memory_commit   (void *virtual_base, U64 bytes, Core_Commit_Flag mode)  { }
-fn_internal void core_memory_uncommit (void *virtual_base, U64 bytes)                         { }
+fn_internal void co_memory_commit   (void *virtual_base, U64 bytes, CO_Commit_Flag mode)  { }
+fn_internal void co_memory_uncommit (void *virtual_base, U64 bytes)                         { }
 
 // ------------------------------------------------------------
 // #-- WASM entry point.
@@ -89,7 +89,7 @@ fn_entry void wasm_entry_point(U32 cpu_logical_cores) {
   wasm_context.mmu_page_bytes     = u64_kilobytes(64);
   wasm_context.ram_capacity_bytes = u64_gigabytes(4);
 
-  core_entry_point(0, 0);
+  co_entry_point(0, 0);
 }
 
 

@@ -17,10 +17,10 @@ fn_internal U08 *arena_chunk_allocate(Arena_Chunk *chunk, U64 bytes, Arena_Push 
     if ((alloc_end - chunk->base_memory) >= chunk->reserved) {
       return 0;
     } else {
-      U64 page_bytes = core_context()->mmu_page_bytes;
+      U64 page_bytes = co_context()->mmu_page_bytes;
       U64 grow_bytes = address_align((U64)(alloc_end - chunk->next_page), page_bytes);
   
-      core_memory_commit(chunk->next_page, grow_bytes, Core_Commit_Flag_Read | Core_Commit_Flag_Write);
+      co_memory_commit(chunk->next_page, grow_bytes, CO_Commit_Flag_Read | CO_Commit_Flag_Write);
       chunk->next_page += grow_bytes;
     }
   }
@@ -51,7 +51,7 @@ fn_internal void arena_chunk_deallocate(Arena_Chunk *chunk) {
     .next           = chunk->next,
   };
 
-  core_memory_uncommit(chunk->base_memory, chunk->next_page - chunk->base_memory);
+  co_memory_uncommit(chunk->base_memory, chunk->next_page - chunk->base_memory);
   
   Arena_Push header_alloc = { .align = Arena_Alignment_Default, .flags = 0 };
   Arena_Chunk *new_header = (Arena_Chunk *)arena_chunk_allocate(&chunk_header, sizeof(Arena_Chunk), &header_alloc);
@@ -59,7 +59,7 @@ fn_internal void arena_chunk_deallocate(Arena_Chunk *chunk) {
 }
 
 fn_internal Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) {
-  U64 page_bytes = core_context()->mmu_page_bytes;
+  U64 page_bytes = co_context()->mmu_page_bytes;
   
   reserve_bytes = reserve_bytes + sizeof(Arena_Chunk);
   reserve_bytes = address_align(reserve_bytes, page_bytes);
@@ -71,7 +71,7 @@ fn_internal Arena_Chunk *arena_chunk_init(Arena_Chunk *prev, U64 reserve_bytes) 
   chunk.header.magic = arena_chunk_magic;
 #endif
 
-  chunk.base_memory = core_memory_reserve(reserve_bytes);
+  chunk.base_memory = co_memory_reserve(reserve_bytes);
   chunk.next_page   = chunk.base_memory;
   chunk.reserved    = reserve_bytes;
   chunk.current     = chunk.base_memory;
@@ -100,8 +100,8 @@ fn_internal Arena_Chunk *arena_chunk_destroy(Arena_Chunk *chunk) {
   U64 uncommit_bytes  = chunk->next_page - chunk->base_memory;
   U64 unreserve_bytes = chunk->reserved;
   
-  core_memory_uncommit  (base_memory, uncommit_bytes);
-  core_memory_unreserve (base_memory, unreserve_bytes);
+  co_memory_uncommit  (base_memory, uncommit_bytes);
+  co_memory_unreserve (base_memory, unreserve_bytes);
 
   return prev;
 }
@@ -262,7 +262,7 @@ fn_internal void arena_temp_end(Arena_Temp *temporary) {
     Arena_Chunk *it = temporary->arena->last_chunk;
     while (it != temporary->rollback_chunk) it = arena_chunk_destroy(it);
 
-    core_memory_uncommit(temporary->rollback_page, it->next_page - temporary->rollback_page);
+    co_memory_uncommit(temporary->rollback_page, it->next_page - temporary->rollback_page);
     it->next_page = temporary->rollback_page;
     it->current = temporary->rollback_current;
    
@@ -459,15 +459,15 @@ fn_internal void logger_write_entry_standard_stream(Logger_Entry_Type type, Str 
   switch (type) {
     case Logger_Entry_Error:
     case Logger_Entry_Fatal: {
-        core_stream_write(buffer, Core_Stream_Standard_Error);
+        co_stream_write(buffer, CO_Stream_Standard_Error);
     } break;
 
     case Logger_Entry_Warning: {
-        core_stream_write(buffer, Core_Stream_Standard_Error);
+        co_stream_write(buffer, CO_Stream_Standard_Error);
     } break;
 
     default: {
-        core_stream_write(buffer, Core_Stream_Standard_Output);
+        co_stream_write(buffer, CO_Stream_Standard_Output);
     } break;
   }
 }
@@ -476,7 +476,7 @@ fn_internal void log_message_ext(Logger_Entry_Type type, Function_Metadata func_
   if (logger_filter_type(type)) {
     Logger_Entry entry = { 
       .type = type, 
-      .time = core_local_time(), 
+      .time = co_local_time(), 
       .meta = func_meta,
     }; 
 
@@ -878,7 +878,7 @@ fn_internal U32 crc32(U64 bytes, U08 *dat) {
 // ------------------------------------------------------------
 // #-- Entry Point
 
-fn_internal void core_entry_point(I32 argument_count, char **argument_values) {
+fn_internal void co_entry_point(I32 argument_count, char **argument_values) {
   
   // TODO(cmat): Just have a thread_local thread context initialization instead.
   scratch_init_for_thread();

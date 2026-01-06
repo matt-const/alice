@@ -13,7 +13,7 @@
 # include <sys/syscall.h>
 # include <sys/sysctl.h>
 
-# include "core_macos.m"
+# include "co_macos.m"
 
 #elif OS_LINUX
 # include <unistd.h>
@@ -27,7 +27,7 @@
 
 # include <linux/io_uring.h>
 
-# include "core_linux.c"
+# include "co_linux.c"
 
 #elif OS_WASM
 

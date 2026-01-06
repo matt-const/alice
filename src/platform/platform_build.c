@@ -8,7 +8,7 @@
 # include <CoreVideo/CoreVideo.h>
 # include <Metal/Metal.h>
 
-# include "platform_macos.m"
+# include "pl_macos.m"
 
 #elif OS_LINUX
 
@@ -17,7 +17,7 @@
 # include <GL/gl.h>
 # include <GL/glx.h>
 
-# include "platform_linux.c"
+# include "pl_linux.c"
 
 #elif OS_WASM
 

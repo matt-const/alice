@@ -321,7 +321,7 @@ fn_internal void metal_create_default_textures(void) {
 
 // NOTE(cmat): Begin frame, End frame.
 // #--
-fn_internal void r_init(Platform_Render_Context *context) {
+fn_internal void r_init(PL_Render_Context *context) {
   If_Unlikely(!Metal_State.initialized) {
     @autoreleasepool {
       Metal_State.initialized = 1;
@@ -348,7 +348,7 @@ fn_internal void r_init(Platform_Render_Context *context) {
 }
 
 fn_internal void r_frame_flush(void) {
-  V2F display_size = platform_display()->resolution;
+  V2F display_size = pl_display()->resolution;
   
   @autoreleasepool {
     id<CAMetalDrawable> drawable = [Metal_State.layer nextDrawable];

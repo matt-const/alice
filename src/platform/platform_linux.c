@@ -1,10 +1,10 @@
 // (C) Copyright 2025 Matyas Constans
 // Licensed under the MIT License (https://opensource.org/license/mit/)
 
-var_global Platform_Frame_State linux_frame_state;
+var_global PL_Frame_State linux_frame_state;
 
-fn_internal Platform_Bootstrap linux_default_bootstrap(void) {
-  Platform_Bootstrap boot = {
+fn_internal PL_Bootstrap linux_default_bootstrap(void) {
+  PL_Bootstrap boot = {
     .title        = str_lit("Alice Engine"),
     .next_frame   = 0,
     .render       = {
@@ -15,13 +15,13 @@ fn_internal Platform_Bootstrap linux_default_bootstrap(void) {
   return boot;
 }
 
-fn_internal Platform_Frame_State *platform_frame_state(void) {
+fn_internal PL_Frame_State *pl_frame_state(void) {
   return &linux_frame_state;
 } 
 
 fn_internal void base_entry_point(Array_Str command_line) {
-  Platform_Bootstrap boot = linux_default_bootstrap();
-  platform_entry_point(command_line, &boot);
+  PL_Bootstrap boot = linux_default_bootstrap();
+  pl_entry_point(command_line, &boot);
 
   Display *display = XOpenDisplay(0);
   I32 screen = DefaultScreen(display);
@@ -89,7 +89,7 @@ fn_internal void base_entry_point(Array_Str command_line) {
 
   GLXContext opengl_context = glXCreateContextAttribsARB(display, framebuffer_configs[0], 0, True, context_attribs);
   if (!opengl_context) {
-    core_panic(str_lit("failed to create an OpenGL 4.5 context"));
+    co_panic(str_lit("failed to create an OpenGL 4.5 context"));
   }
 
   glXMakeCurrent(display, window, opengl_context);
@@ -97,8 +97,8 @@ fn_internal void base_entry_point(Array_Str command_line) {
   XFree(visual_info);
   visual_info = 0;
 
-  Platform_Render_Context render_context = {
-    .backend     = Platform_Render_Backend_OpenGL4,
+  PL_Render_Context render_context = {
+    .backend     = PL_Render_Backend_OpenGL4,
     .os_handle_1 = (U08 *)&opengl_context,
     .os_handle_2 = 0,
   };

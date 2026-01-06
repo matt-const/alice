@@ -24,7 +24,7 @@ typedef struct IM_TGA_Header {
 
 #pragma pack(pop)
 
-fn_internal inline void im_bitmap_write_file_tga(IM_Bitmap *bitmap, Core_File *file) {
+fn_internal inline void im_bitmap_write_file_tga(IM_Bitmap *bitmap, CO_File *file) {
   if (bitmap->channels != 3) Not_Implemented;
 
   IM_TGA_Header header = {
@@ -45,8 +45,8 @@ fn_internal inline void im_bitmap_write_file_tga(IM_Bitmap *bitmap, Core_File *f
   U64  header_bytes = sizeof(header);
   U64  image_bytes  = 3 * sizeof(U08) * bitmap->width * bitmap->height;
 
-  core_file_write(file, 0,            header_bytes, &header);
-  core_file_write(file, header_bytes, image_bytes,  bitmap->dat);
+  co_file_write(file, 0,            header_bytes, &header);
+  co_file_write(file, header_bytes, image_bytes,  bitmap->dat);
 }
 
 // ------------------------------------------------------------
@@ -64,8 +64,8 @@ fn_internal inline IM_Bitmap im_bitmap_allocate(Arena *arena, U32 width, U32 hei
 }
 
 fn_internal inline void im_bitmap_write_file(IM_Bitmap *bitmap, Str filepath, IM_File_Format format) {
-  Core_File file = { };
-  File_IO_Scope(&file, filepath, Core_File_Access_Flag_Create | Core_File_Access_Flag_Truncate | Core_File_Access_Flag_Write) {
+  CO_File file = { };
+  File_IO_Scope(&file, filepath, CO_File_Access_Flag_Create | CO_File_Access_Flag_Truncate | CO_File_Access_Flag_Write) {
     switch (format) {
       case IM_File_Format_TGA: { im_bitmap_write_file_tga(bitmap, &file); } break;
     }

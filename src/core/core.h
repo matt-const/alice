@@ -617,70 +617,70 @@ fn_internal Local_Time local_time_from_unix_time(U64 unix_seconds, U64 unix_micr
 // ------------------------------------------------------------
 // #-- Core Operating System Features
 
-typedef struct Core_Context {
+typedef struct CO_Context {
   Str cpu_name;
   U64 cpu_logical_cores;
   U64 mmu_page_bytes;
   U64 ram_capacity_bytes;
-} Core_Context;
+} CO_Context;
 
-typedef U32 Core_Stream;
+typedef U32 CO_Stream;
 enum {
-  Core_Stream_Standard_Output,
-  Core_Stream_Standard_Error,
+  CO_Stream_Standard_Output,
+  CO_Stream_Standard_Error,
 };
 
-typedef U32 Core_Commit_Flag;
+typedef U32 CO_Commit_Flag;
 enum {
-  Core_Commit_Flag_Read         = 1 << 0,
-  Core_Commit_Flag_Write        = 1 << 1,
-  Core_Commit_Flag_Executable   = 1 << 2,
+  CO_Commit_Flag_Read         = 1 << 0,
+  CO_Commit_Flag_Write        = 1 << 1,
+  CO_Commit_Flag_Executable   = 1 << 2,
 };
 
-typedef struct Core_File {
+typedef struct CO_File {
   U64 os_handle_1;
-} Core_File;
+} CO_File;
 
-typedef U32 Core_File_Access_Flag;
+typedef U32 CO_File_Access_Flag;
 enum {
-  Core_File_Access_Flag_Read        = 1 << 0,
-  Core_File_Access_Flag_Write       = 1 << 1,
+  CO_File_Access_Flag_Read        = 1 << 0,
+  CO_File_Access_Flag_Write       = 1 << 1,
 
-  Core_File_Access_Flag_Create      = 1 << 2,
-  Core_File_Access_Flag_Truncate    = 1 << 3,
-  Core_File_Access_Flag_Append      = 1 << 4,
+  CO_File_Access_Flag_Create      = 1 << 2,
+  CO_File_Access_Flag_Truncate    = 1 << 3,
+  CO_File_Access_Flag_Append      = 1 << 4,
 };
 
-typedef struct Core_File_Async_State {
+typedef struct CO_File_Async_State {
   U64 os_handle_1;
-} Core_File_Async_State;
+} CO_File_Async_State;
 
-fn_internal Core_Context *            core_context              (void);
-fn_internal void                      core_stream_write         (Str buffer, Core_Stream stream);
-fn_internal void                      core_panic                (Str reason);
-fn_internal Local_Time                core_local_time           (void);
+fn_internal CO_Context *              co_context              (void);
+fn_internal void                      co_stream_write         (Str buffer, CO_Stream stream);
+fn_internal void                      co_panic                (Str reason);
+fn_internal Local_Time                co_local_time           (void);
 
-fn_internal U08 *                     core_memory_reserve       (U64 bytes);
-fn_internal void                      core_memory_unreserve     (void *virtual_base, U64 bytes);
-fn_internal void                      core_memory_commit        (void *virtual_base, U64 bytes, Core_Commit_Flag mode);
-fn_internal void                      core_memory_uncommit      (void *virtual_base, U64 bytes);
+fn_internal U08 *                     co_memory_reserve       (U64 bytes);
+fn_internal void                      co_memory_unreserve     (void *virtual_base, U64 bytes);
+fn_internal void                      co_memory_commit        (void *virtual_base, U64 bytes, CO_Commit_Flag mode);
+fn_internal void                      co_memory_uncommit      (void *virtual_base, U64 bytes);
 
-fn_internal void                      core_entry_point          (I32 arg_count, char **arg_values);
+fn_internal void                      co_entry_point          (I32 arg_count, char **arg_values);
 
-fn_internal B32                       core_directory_create     (Str folder_path);
-fn_internal B32                       core_directory_delete     (Str folder_path);
+fn_internal B32                       co_directory_create     (Str folder_path);
+fn_internal B32                       co_directory_delete     (Str folder_path);
 
-fn_internal Core_File                 core_file_open            (Str file_path, Core_File_Access_Flag flags);
-fn_internal void                      core_file_close           (Core_File *file);
-fn_internal U64                       core_file_size            (Core_File *file);
+fn_internal CO_File                   co_file_open            (Str file_path, CO_File_Access_Flag flags);
+fn_internal void                      co_file_close           (CO_File *file);
+fn_internal U64                       co_file_size            (CO_File *file);
 
-fn_internal void                      core_file_read            (Core_File *file, U64 offset, U64 bytes, void *data);
-fn_internal void                      core_file_write           (Core_File *file, U64 offset, U64 bytes, void *data);
+fn_internal void                      co_file_read            (CO_File *file, U64 offset, U64 bytes, void *data);
+fn_internal void                      co_file_write           (CO_File *file, U64 offset, U64 bytes, void *data);
 
-fn_internal Core_File_Async_State     core_file_read_async      (Core_File *file, U64 offset, U64 bytes, void *data);
-fn_internal Core_File_Async_State     core_file_write_async     (Core_File *file, U64 offset, U64 bytes, void *data);
+fn_internal CO_File_Async_State       co_file_read_async      (CO_File *file, U64 offset, U64 bytes, void *data);
+fn_internal CO_File_Async_State       co_file_write_async     (CO_File *file, U64 offset, U64 bytes, void *data);
 
-#define File_IO_Scope(file_, str_, mode_) Defer_Scope(*(file_) = core_file_open(str_, mode_), core_file_close(file_))
+#define File_IO_Scope(file_, str_, mode_) Defer_Scope(*(file_) = co_file_open(str_, mode_), co_file_close(file_))
 
 // ------------------------------------------------------------
 // #-- Runtime Assertion
@@ -688,9 +688,9 @@ fn_internal Core_File_Async_State     core_file_write_async     (Core_File *file
 # define Assert_Preamble "ASSERT (" __FILE__ ":" Macro_Stringize(__LINE__) "): "
 
 # if COMPILER_GCC || COMPILER_CLANG
-#   define Assert(condition, message) do { If_Unlikely (!(condition)) { core_panic(str_lit(Assert_Preamble " " message)); __builtin_debugtrap(); } } while(0)
+#   define Assert(condition, message) do { If_Unlikely (!(condition)) { co_panic(str_lit(Assert_Preamble " " message)); __builtin_debugtrap(); } } while(0)
 # elif COMPILER_MSVC
-#   define Assert(condition, message) do { If_Unlikely (!(condition)) { core_panic(str_lit(Assert_Preamble " " message)); __debugbreak(); } } while(0)
+#   define Assert(condition, message) do { If_Unlikely (!(condition)) { co_panic(str_lit(Assert_Preamble " " message)); __debugbreak(); } } while(0)
 # endif
 #else
 # define Assert(condition, message) do { } while(0)

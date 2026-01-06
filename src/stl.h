@@ -39,9 +39,9 @@ fn_internal R_Vertex_XUC_3D *stl_parse_binary(Arena *arena, U64 bytes, U08 *data
         V3F R = rgb_from_hsv(v3f(it / (F32)header->tri_count, .8f, .8f));
         U32 C = abgr_u32_from_rgba_premul(v4f(R.x, R.y, R.z, 1.f));
 
-        result[3 * it + 0] = (R_Vertex_XUC_3D) { .X = v3f(tri.position_1.x, tri.position_1.y + 0.01f, tri.position_1.z), .C = C, .U = v2f(0, 0) };
-        result[3 * it + 1] = (R_Vertex_XUC_3D) { .X = v3f(tri.position_2.x, tri.position_2.y + 0.01f, tri.position_2.z), .C = C, .U = v2f(1, 0) };
-        result[3 * it + 2] = (R_Vertex_XUC_3D) { .X = v3f(tri.position_3.x, tri.position_3.y + 0.01f, tri.position_3.z), .C = C, .U = v2f(0, 1) };
+        result[3 * it + 0] = (R_Vertex_XUC_3D) { .X = tri.position_1, .C = C, .U = v2f(0, 0) };
+        result[3 * it + 1] = (R_Vertex_XUC_3D) { .X = tri.position_2, .C = C, .U = v2f(1, 0) };
+        result[3 * it + 2] = (R_Vertex_XUC_3D) { .X = tri.position_3, .C = C, .U = v2f(0, 1) };
       }
     } else {
       log_warning("STL parse error");

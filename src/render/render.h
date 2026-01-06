@@ -186,7 +186,7 @@ typedef struct R_Command_Draw {
 fn_internal void r_command_reset      (void);
 fn_internal void r_command_push_draw  (R_Command_Draw *draw);
 
-fn_internal void r_init               (Platform_Render_Context *render_context);
+fn_internal void r_init               (PL_Render_Context *render_context);
 fn_internal void r_frame_flush        (void);
 
 // ------------------------------------------------------------
@@ -195,6 +195,7 @@ fn_internal void r_frame_flush        (void);
 var_external R_Shader  R_Shader_Flat_2D;
 var_external R_Shader  R_Shader_Flat_3D;
 var_external R_Shader  R_Shader_Grid_3D;
+var_external R_Shader  R_Shader_DVR_3D;
 
 var_external R_Texture R_Texture_White;
 
