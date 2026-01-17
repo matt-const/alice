@@ -33,7 +33,7 @@ var_global struct {
   R_Buffer            vertex_buffer;
   R_Buffer            index_buffer;
   R_Buffer            constant_viewport_2D;
-  R_Texture           texture;
+  R_Texture_2D        texture;
   R_Pipeline          pipelines[G2_Draw_Mode_Count];
   G2_Draw_Mode        draw_mode;
 
@@ -56,7 +56,7 @@ fn_internal void g2_init(void) {
   G2_State.pipelines[G2_Draw_Mode_Flat] = r_pipeline_create(R_Shader_Flat_2D, &R_Vertex_Format_XUC_2D, 0);
   // G2_State.pipelines[G2_Draw_Mode_MTSDF]  = r_pipeline_create(R_Shader_MTSDF_2D,  &R_Vertex_Format_XUC_2D);
 
-  G2_State.texture              = R_Texture_White;
+  G2_State.texture              = R_Texture_2D_White;
   G2_State.constant_viewport_2D = r_buffer_allocate(sizeof(R_Constant_Buffer_Viewport_2D), R_Buffer_Mode_Dynamic);
   G2_State.last_clip_region     = r2i(0, 0, i32_limit_max, i32_limit_max);
   G2_State.active_clip_region   = G2_State.last_clip_region;
@@ -95,6 +95,7 @@ fn_internal void g2_submit_draw(void) {
         .index_buffer          = G2_State.index_buffer,
         .pipeline              = G2_State.pipelines[G2_State.draw_mode],
         .texture               = G2_State.texture,
+        .texture_volume        = R_Texture_3D_White,
         .sampler               = R_Sampler_Linear_Clamp,
         
         .draw_index_count      = G2_State.buffer.draw_index_count,
@@ -135,7 +136,7 @@ typedef struct {
   U32              base_index;
 } G2_Draw_Entry;
 
-fn_internal G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Texture texture, G2_Draw_Mode mode) {
+fn_internal G2_Draw_Entry g2_push_draw(U32 vertex_count, U32 index_count, R_Texture_2D texture, G2_Draw_Mode mode) {
   Assert(G2_State.buffer.vertex_at  + vertex_count  < G2_State.buffer.vertex_capacity,  "2D immediate vertex buffer overflow");
   Assert(G2_State.buffer.index_at   + index_count   < G2_State.buffer.index_capacity,   "2D immediate index buffer overflow");
 
@@ -259,7 +260,7 @@ fn_internal void g2_draw_rect_rounded_ext(G2_Rect_Rounded *rect) {
     index_count = 3 * 6 + 4 * 6;
   }
 
-  G2_Draw_Entry entry = g2_push_draw(vertex_count, index_count, R_Texture_White, G2_Draw_Mode_Flat);
+  G2_Draw_Entry entry = g2_push_draw(vertex_count, index_count, R_Texture_2D_White, G2_Draw_Mode_Flat);
 
   U32 index_at = 0;
 
@@ -357,7 +358,7 @@ do {                                                                            
 
 fn_internal void g2_draw_disk_ext(G2_Disk *disk) {
   U32 resolution = disk->resolution;
-  G2_Draw_Entry entry = g2_push_draw(resolution + 1, 3 * resolution, R_Texture_White, G2_Draw_Mode_Flat);
+  G2_Draw_Entry entry = g2_push_draw(resolution + 1, 3 * resolution, R_Texture_2D_White, G2_Draw_Mode_Flat);
 
   For_U32(it, resolution) {
     entry.indices[3 * it + 0] = entry.base_index;
@@ -380,7 +381,7 @@ fn_internal void g2_draw_disk_ext(G2_Disk *disk) {
 }
 
 fn_internal void g2_draw_line_ext(G2_Line *line) {
-  G2_Draw_Entry entry = g2_push_draw(4, 6, R_Texture_White, G2_Draw_Mode_Flat);
+  G2_Draw_Entry entry = g2_push_draw(4, 6, R_Texture_2D_White, G2_Draw_Mode_Flat);
 
   entry.indices[0] = entry.base_index + 0;
   entry.indices[1] = entry.base_index + 1;

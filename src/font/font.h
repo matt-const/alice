@@ -27,7 +27,7 @@ typedef struct FO_Font {
   I32            metric_line_gap;
 
   V2_U16         glyph_atlas_size;
-  R_Texture      glyph_atlas;
+  R_Texture_2D   glyph_atlas;
   U64            glyph_bucket_count;
   FO_Glyph_List *glyph_bucket_array;
 } FO_Font;

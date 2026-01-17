@@ -11,6 +11,9 @@ struct Viewport_2D_Type {
 @group(0) @binding(2)
 var<uniform> Viewport_2D : Viewport_2D_Type;
 
+@group(0) @binding(3)
+var Texture_Volume : texture_3d<f32>;
+
 fn vec4_unpack_u32(packed: u32) -> vec4<f32> {
   let r = f32((packed >> 0)  & 0xFFu) / 255.0;
   let g = f32((packed >> 8)  & 0xFFu) / 255.0;

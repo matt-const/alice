@@ -368,16 +368,54 @@ const WebGPU_Texture_Format_Lookup_Name = [
   'rgba8snorm',
   'r8unorm',
   'r8snorm',
+  'r32float',
 ];
 
 const WebGPU_Texture_Format_Lookup_Bytes = [
   4,
   4,
   1,
-  1
+  1,
+  4
 ];
 
-function js_webgpu_texture_allocate(format, width, height) {
+function js_webgpu_texture_3D_allocate(format, width, height, depth) {
+  const texture = wasm_context.webgpu.device.createTexture({
+    dimension: "3d",
+    size:     { width, height, depthOrArrayLayers: depth },
+    format:   WebGPU_Texture_Format_Lookup_Name[format],
+    usage:    GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+
+  return wasm_context.webgpu.handle_map.store(texture);
+}
+
+function js_webgpu_texture_3D_download(texture_handle, download_format, region_x0, region_y0, region_z0, region_x1, region_y1, region_z1, data_ptr) {
+  const texture = wasm_context.webgpu.handle_map.get(texture_handle);
+
+  const region_width  = (region_x1 - region_x0);
+  const region_height = (region_y1 - region_y0);
+  const region_depth  = (region_z1 - region_z0);
+
+  const pixel_bytes   = WebGPU_Texture_Format_Lookup_Bytes[download_format];
+  const region_bytes  = region_width * region_height * region_depth * pixel_bytes;
+  const data          = new Uint8Array(wasm_context.memory.buffer, data_ptr, region_bytes);
+
+  wasm_context.webgpu.device.queue.writeTexture(
+    { texture: texture, mipLevel: 0, origin: { x: region_x0, y: region_y0, z: region_z0, }, },
+    data,
+    { bytesPerRow: region_width * pixel_bytes, rowsPerImage: region_height, },
+    { width: region_width, height: region_height, depthOrArrayLayers: region_depth, }
+  );
+}
+
+function js_webgpu_texture_3D_destroy(texture_handle) {
+  const texture = wasm_context.webgpu.handle_map.get(texture_handle);
+  wasm_context.webgpu.handle_map.remove(texture_handle);
+  texture.destroy();
+}
+
+function js_webgpu_texture_2D_allocate(format, width, height) {
   const texture = wasm_context.webgpu.device.createTexture({
     size:     [ width, height ],
     format:   WebGPU_Texture_Format_Lookup_Name[format],
@@ -387,7 +425,7 @@ function js_webgpu_texture_allocate(format, width, height) {
   return wasm_context.webgpu.handle_map.store(texture);
 }
 
-function js_webgpu_texture_download(texture_handle, download_format, region_x0, region_y0, region_x1, region_y1, data_ptr) {
+function js_webgpu_texture_2D_download(texture_handle, download_format, region_x0, region_y0, region_x1, region_y1, data_ptr) {
   const texture = wasm_context.webgpu.handle_map.get(texture_handle);
 
   const region_width  = (region_x1 - region_x0);
@@ -404,7 +442,7 @@ function js_webgpu_texture_download(texture_handle, download_format, region_x0, 
   );
 }
 
-function js_webgpu_texture_destroy(texture_handle) {
+function js_webgpu_texture_2D_destroy(texture_handle) {
   const texture = wasm_context.webgpu.handle_map.get(texture_handle);
   wasm_context.webgpu.handle_map.remove(texture_handle);
   texture.destroy();
@@ -470,6 +508,12 @@ function js_webgpu_pipeline_create(shader_handle, vertex_format_ptr, depth_buffe
             binding: 2,
             visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
             buffer: { type: 'uniform' },
+          },
+
+          {
+            binding: 3,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'unfilterable-float', viewDimension: '3d' },
           }
         ]
       })
@@ -551,7 +595,7 @@ function js_webgpu_pipeline_destroy(pipeline_handle) {
 }
 
 function js_webgpu_frame_flush(draw_command_ptr) {
-  const draw_command_view = new DataView(wasm_context.memory.buffer, draw_command_ptr, 17 * 4);
+  const draw_command_view = new DataView(wasm_context.memory.buffer, draw_command_ptr, 18 * 4);
   
   let offset = 0;
   const constant_buffer_handle = draw_command_view.getUint32 (offset, true); offset += 4;
@@ -559,6 +603,7 @@ function js_webgpu_frame_flush(draw_command_ptr) {
   const index_buffer_handle    = draw_command_view.getUint32 (offset, true); offset += 4;
   const pipeline_handle        = draw_command_view.getUint32 (offset, true); offset += 4;
   const texture_handle         = draw_command_view.getUint32 (offset, true); offset += 4;
+  const texture_volume_handle  = draw_command_view.getUint32 (offset, true); offset += 4;
   const sampler_handle         = draw_command_view.getUint32 (offset, true); offset += 4;
 
   const draw_index_count       = draw_command_view.getUint32 (offset, true); offset += 4;
@@ -582,6 +627,7 @@ function js_webgpu_frame_flush(draw_command_ptr) {
   const index_buffer    = wasm_context.webgpu.handle_map.get(index_buffer_handle);
   const pipeline        = wasm_context.webgpu.handle_map.get(pipeline_handle);
   const texture         = wasm_context.webgpu.handle_map.get(texture_handle);
+  const texture_volume  = wasm_context.webgpu.handle_map.get(texture_volume_handle);
   const sampler         = wasm_context.webgpu.handle_map.get(sampler_handle);
 
   const bind_group = wasm_context.webgpu.device.createBindGroup({
@@ -590,6 +636,7 @@ function js_webgpu_frame_flush(draw_command_ptr) {
       { binding: 0, resource: texture.createView(), },
       { binding: 1, resource: sampler, },
       { binding: 2, resource: { buffer: constant_buffer } },
+      { binding: 3, resource: texture_volume.createView(), },
     ]
   });
 
@@ -727,9 +774,13 @@ function wasm_module_load(wasm_bytecode) {
       js_webgpu_buffer_download:      js_webgpu_buffer_download,
       js_webgpu_buffer_destroy:       js_webgpu_buffer_destroy,
 
-      js_webgpu_texture_allocate:     js_webgpu_texture_allocate,
-      js_webgpu_texture_download:     js_webgpu_texture_download,
-      js_webgpu_texture_destroy:      js_webgpu_texture_destroy,
+      js_webgpu_texture_3D_allocate:  js_webgpu_texture_3D_allocate,
+      js_webgpu_texture_3D_download:  js_webgpu_texture_3D_download,
+      js_webgpu_texture_3D_destroy:   js_webgpu_texture_3D_destroy,
+
+      js_webgpu_texture_2D_allocate:  js_webgpu_texture_2D_allocate,
+      js_webgpu_texture_2D_download:  js_webgpu_texture_2D_download,
+      js_webgpu_texture_2D_destroy:   js_webgpu_texture_2D_destroy,
 
       js_webgpu_sampler_create:       js_webgpu_sampler_create,
       js_webgpu_sampler_destroy:      js_webgpu_sampler_destroy,

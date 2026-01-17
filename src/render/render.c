@@ -4,11 +4,12 @@
 // ------------------------------------------------------------
 // #-- Default Resources
 
-R_Shader   R_Shader_Invalid   = {};
-R_Buffer   R_Buffer_Invalid   = {};
-R_Texture  R_Texture_Invalid  = {};
-R_Sampler  R_Sampler_Invalid  = {};
-R_Pipeline R_Pipeline_Invalid = {};
+R_Shader      R_Shader_Invalid     = {};
+R_Buffer      R_Buffer_Invalid     = {};
+R_Texture_2D  R_Texture_2D_Invalid = {};
+R_Texture_3D  R_Texture_3D_Invalid = {};
+R_Sampler     R_Sampler_Invalid    = {};
+R_Pipeline    R_Pipeline_Invalid   = {};
 
 // ------------------------------------------------------------
 // #-- Render Commands

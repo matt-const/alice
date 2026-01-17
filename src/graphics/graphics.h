@@ -10,10 +10,10 @@ fn_internal void g2_frame_flush (void);
 fn_internal void g2_clip_region (R2I region);
 
 typedef struct G2_Tri {
-  V2F       x1, x2, x3;
-  V2F       u1, u2, u3;
-  RGBA      color;
-  R_Texture tex;
+  V2F          x1, x2, x3;
+  V2F          u1, u2, u3;
+  RGBA         color;
+  R_Texture_2D tex;
 } G2_Tri;
 
 // NOTE(cmat): Triangle
@@ -28,18 +28,18 @@ fn_internal void g2_draw_tri_ext(G2_Tri *tri);
       .u2       = v2f(1.f, 0.f),              \
       .u3       = v2f(0.f, 1.f),              \
       .color    = v4f(1, 1, 1, 1),            \
-      .tex      = R_Texture_White,            \
+      .tex      = R_Texture_2D_White,         \
       ##__VA_ARGS__,                          \
   })
 
 // NOTE(cmat): Rectangle
 
 typedef struct G2_Rect_Grad {
-  V2F       pos;
-  V2F       size;
-  V2F       *uv_array;
-  RGBA      *color_array;
-  R_Texture tex;
+  V2F         pos;
+  V2F         size;
+  V2F         *uv_array;
+  RGBA        *color_array;
+  R_Texture_2D tex;
 } G2_Rect_Grad;
 
 fn_internal void g2_draw_rect_grad_ext(G2_Rect_Grad *rect);
@@ -49,18 +49,18 @@ fn_internal void g2_draw_rect_grad_ext(G2_Rect_Grad *rect);
       .size           = size_,                                          \
       .uv_array       = uv_array_,                                      \
       .color_array    = color_array_,                                   \
-      .tex            = R_Texture_White,                                \
+      .tex            = R_Texture_2D_White,                             \
       ##__VA_ARGS__,                                                    \
   })
 
 
 typedef struct G2_Rect {
-  V2F       pos;
-  V2F       size;
-  V2F       uv_bl;
-  V2F       uv_tr;
-  RGBA      color;
-  R_Texture tex;
+  V2F          pos;
+  V2F          size;
+  V2F          uv_bl;
+  V2F          uv_tr;
+  RGBA         color;
+  R_Texture_2D tex;
 } G2_Rect;
 
 fn_internal void g2_draw_rect_ext(G2_Rect *rect);
@@ -71,7 +71,7 @@ fn_internal void g2_draw_rect_ext(G2_Rect *rect);
       .uv_bl          = v2f(0, 0),            \
       .uv_tr          = v2f(1, 1),            \
       .color          = v4f(1, 1, 1, 1),      \
-      .tex            = R_Texture_White,      \
+      .tex            = R_Texture_2D_White,   \
       ##__VA_ARGS__,                          \
   })
 

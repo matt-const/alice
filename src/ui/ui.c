@@ -18,10 +18,10 @@ var_global struct {
   U32           font_stack_at; 
   FO_Font     **font_stack;
 
-  UI_Node      *root;
-
-  B32           next_overlay;
-  UI_Node_List  overlay_list;
+  UI_Node_Location next_location;
+  UI_Node         *root;
+  UI_Node         *context;
+  UI_Node_List     overlay_list;
 
   B32           debug_mode;
   Random_Seed   debug_rng;
@@ -222,6 +222,19 @@ fn_internal void ui_node_update_animation(UI_Node *node) {
 }
 
 fn_internal UI_ID ui_node_id(Str label, UI_ID parent_id) {
+
+  // NOTE(cmat): If the string contains ###, only hash the part after "###"
+  // NOTE(cmat): If the string contains ##, we hash everything but ignore things after ## for the label.
+  if (str_contains(label, str_lit("###"))) {
+    U32 it = 0;
+    while (label.txt[it] != '#') {
+      it++;
+    }
+
+    it += 2;
+    label = str_slice(label, it, label.len - it);
+  }
+
   UI_ID hash = 0;
   Scratch scratch = { };
   Scratch_Scope(&scratch, 0) {
@@ -237,8 +250,8 @@ fn_internal UI_ID ui_node_id(Str label, UI_ID parent_id) {
   return hash;
 }
 
-fn_internal void ui_set_next_overlay(void) {
-  UI_State.next_overlay = 1;
+fn_internal void ui_next_location(UI_Node_Location location) {
+  UI_State.next_location = location;
 }
 
 fn_internal UI_Node *ui_node_push(Str label, UI_Flags flags) {
@@ -246,7 +259,7 @@ fn_internal UI_Node *ui_node_push(Str label, UI_Flags flags) {
 
   // NOTE(cmat): If it's an overlay, it doesn't have any parents
   // (since an overlay node is considered a 'root' node)
-  if (!UI_State.next_overlay) {
+  if (UI_State.next_location == UI_Node_Location_None) {
     parent = ui_parent_current();
   }
 
@@ -263,12 +276,18 @@ fn_internal UI_Node *ui_node_push(Str label, UI_Flags flags) {
   ui_node_update_animation  (node);
 
   // NOTE(cmat): If it's an overlay, push on the overlay stack.
-  if (UI_State.next_overlay) {
-    UI_Node_List *list = &UI_State.overlay_list;
-    queue_push_ext(list->first, list->last, node, overlay_next);
+  switch (UI_State.next_location) {
+    case UI_Node_Location_Overlay: {
+      UI_Node_List *list = &UI_State.overlay_list;
+      queue_push_ext(list->first, list->last, node, overlay_next);
+    } break;
+    
+    case UI_Node_Location_Context: {
+      UI_State.context = node;
+    } break;
   }
 
-  UI_State.next_overlay = 0;
+  UI_State.next_location = UI_Node_Location_None;
   return node;
 }
 
@@ -558,7 +577,9 @@ fn_internal void ui_draw(UI_Node *node, UI_Draw_Context *context) {
 
       V2F position = region_inner_fill.min;
       V2F size     = v2f_sub(region_inner_fill.max, region_inner_fill.min);
-      g2_draw_rect(position, size, .color = rgb_color);
+      if (size.x >= 0.1f) {
+        g2_draw_rect_rounded(position, size, size.x/2, .segments=6, .color = rgb_color);
+      }
     }
 
     if (node->flags & UI_Flag_Draw_Content_Hook) {
@@ -602,6 +623,8 @@ fn_internal void ui_frame_begin(void) {
   UI_State.overlay_list.first = 0;
   UI_State.overlay_list.last  = 0;
 
+  UI_State.context = 0;
+
   UI_State.debug_mode = pl_input()->keyboard.state[PL_KB_F2];
   UI_State.debug_rng = 1234;
 }
@@ -624,6 +647,10 @@ fn_internal void ui_frame_end(void) {
     ui_solve  (it);
     ui_draw   (it, &draw_context);
   }
+
+  // NOTE(cmat): Solve and draw context menu
+  ui_solve  (UI_State.context);
+  ui_draw   (UI_State.context, &draw_context);
 }
 
 // ------------------------------------------------------------
@@ -765,24 +792,32 @@ fn_internal UI_Response ui_checkbox(Str label, B32 *value) {
   return response;
 }
 
-fn_internal UI_Response ui_edit_f32(Str label, F32 *value, F32 step) {
-  UI_Flags flags =
-    UI_Flag_Response_Hover   |
-    UI_Flag_Response_Down    |
-    UI_Flag_Response_Press   |
-    UI_Flag_Draw_Background  |
-    UI_Flag_Draw_Border      |
-    UI_Flag_Draw_Label;
+fn_internal void ui_f32_edit(Str label, F32 *value) {
+  UI_Parent_Scope(ui_container(label, UI_Container_Mode_None, Axis2_X, UI_Size_Fit, UI_Size_Fit)) {
+    ui_label(str_lit("label"));
 
-  UI_Node *node = ui_node_push(label, flags);
-  node->layout.size[Axis2_X] = UI_Size_Text;
-  node->layout.size[Axis2_Y] = UI_Size_Text;
-  node->layout.gap_border[Axis2_X] = 0; // .25f * node->draw.font->metric_em;
-  node->layout.gap_border[Axis2_Y] = 0; // .25f * node->draw.font->metric_em;
+    UI_Flags flags = 
+      UI_Flag_Response_Hover   |
+      UI_Flag_Response_Down    |
+      UI_Flag_Response_Press   |
+      UI_Flag_Draw_Background  |
+      UI_Flag_Draw_Border      |
+      UI_Flag_Draw_Label;
 
-  node->palette.idle  = hsv_u32(235, 27, 25);
-  node->palette.hover = hsv_u32(235, 24, 44);
-  node->palette.down  = hsv_u32(235, 10, 15);
+    char button_label_buffer[512] = { };
+    Str  button_label = { .txt = (U08 *)button_label_buffer, .len = 0 };
+    button_label.len  = stbsp_snprintf(button_label_buffer, 512, "%.2f###button", *value);
 
-  return node->response;
+    *value += 1.0f;
+
+    UI_Node *node = ui_node_push(button_label, flags);
+    node->layout.size[Axis2_X]       = UI_Size_Text;
+    node->layout.size[Axis2_Y]       = UI_Size_Text;
+    node->layout.gap_border[Axis2_X] = fo_em(node->draw.font, .25f);
+    node->layout.gap_border[Axis2_Y] = fo_em(node->draw.font, .1f);
+
+    node->palette.idle  = hsv_u32(235, 27, 25);
+    node->palette.hover = hsv_u32(235, 24, 44);
+    node->palette.down  = hsv_u32(235, 10, 15);
+  }
 }

@@ -46,37 +46,8 @@ fn vs_main(@location(0) X : vec3<f32>,
    return out;
 }
 
-const box_min       = vec3<f32>(-5.0, -1.0, -1.0);
-const box_max       = vec3<f32>( 5.0,  1.0,  1.0);
-const ray_steps     = 256;
-const ray_step_size = 0.02;
-
-// const ray_steps     = 512;
-// const ray_step_size = 0.01;
-
-fn intersect_ray_box(ray_origin : vec3<f32>, ray_direction : vec3<f32>) -> vec2<f32> {
-  let inv_direction = 1.f / ray_direction;
-
-  let t0      = (box_min - ray_origin) * inv_direction;
-  let t1      = (box_max - ray_origin) * inv_direction;
-
-  let t_min   = min(t0, t1);
-  let t_max   = max(t0, t1);
-
-  let t_enter = max(max(t_min.x, t_min.y), t_min.z);
-  let t_exit  = min(min(t_max.x, t_max.y), t_max.z);
-
-  return vec2<f32>(t_enter, t_exit);
-}
-
-/*
-fn sample_volume(position : vec3<f32>) -> f32 {
-  let p      = (position - box_min) / (box_max - box_min);
-  let voxels = textureDimensions(Texture_Volume);
-  let coords = vec3<i32>(p * vec3<f32>(voxels));
-  return textureLoad(Texture_Volume, coords, 0).r;
-}
-*/
+const box_min       = vec3<f32>(-1.0, -1.0, -1.0);
+const box_max       = vec3<f32>( 1.0,  1.0,  1.0);
 
 fn sample_volume(position: vec3<f32>) -> f32 {
     let p = clamp(
@@ -111,42 +82,12 @@ fn sample_volume(position: vec3<f32>) -> f32 {
     return mix(c0, c1, frac.z);
 }
 
-fn transfer_function(value : f32) -> vec4<f32> {
-  let alpha = 1.0 - exp(-value * ray_step_size);
-  let color = textureSample(Texture, Sampler, vec2<f32>(value, 0));
-  return vec4<f32>(color.rgb, alpha);
-}
-
 @fragment
 fn fs_main(@location(0) X : vec3<f32>,
            @location(1) C : vec4<f32>,
            @location(2) U : vec2<f32> ) -> @location(0) vec4<f32> {
 
-  let ray_origin    = World_3D.Eye_Position;
-  let ray_direction = normalize(X - ray_origin);
-  let t_hit         = intersect_ray_box(ray_origin, ray_direction);
-  let t_enter     = t_hit.x;
-  let t_exit      = t_hit.y;
-
-  if (t_exit < t_enter || t_exit < 0.0) {
-    discard;
-  }
-
-  var accum_color = vec4<f32>(0.0);
-  var ray_t       = max(t_enter, 0.0);
-
-  for (var it = 0; it < ray_steps; it++) {
-  
-    // NOTE(cmat): If dynamic loops supported.
-    // if ((ray_t > t_exit) || accum_color.a >= 1.0) { break; }
-    let mask = select(1.0, 0.0, (ray_t > t_exit) || accum_color.a >= 1.0);
-
-    let sample_position = ray_origin + ray_t * ray_direction;
-    let value           = sample_volume(sample_position);
-    let color           = transfer_function(value);
-    accum_color        += mask * (1.0 - accum_color.a) * vec4<f32>(color.rgb * color.a, color.a);
-    ray_t              += ray_step_size;
-  }
-
-  return accum_color;
+  let sample = sample_volume(X);
+  let color  = textureSample(Texture, Sampler, vec2<f32>(sample, 0));
+  return color;
 }

@@ -39,15 +39,19 @@ fn_internal R_Vertex_XUC_3D *stl_parse_binary(Arena *arena, U64 bytes, U08 *data
         V3F R = rgb_from_hsv(v3f(it / (F32)header->tri_count, .8f, .8f));
         U32 C = abgr_u32_from_rgba_premul(v4f(R.x, R.y, R.z, 1.f));
 
+        tri.position_1 = v3f_had(tri.position_1, v3f(5, 1, 1));
+        tri.position_2 = v3f_had(tri.position_2, v3f(5, 1, 1));
+        tri.position_3 = v3f_had(tri.position_3, v3f(5, 1, 1));
+
         result[3 * it + 0] = (R_Vertex_XUC_3D) { .X = tri.position_1, .C = C, .U = v2f(0, 0) };
         result[3 * it + 1] = (R_Vertex_XUC_3D) { .X = tri.position_2, .C = C, .U = v2f(1, 0) };
         result[3 * it + 2] = (R_Vertex_XUC_3D) { .X = tri.position_3, .C = C, .U = v2f(0, 1) };
       }
     } else {
-      log_warning("STL parse error");
+      log_fatal("STL parse error");
     }
   } else {
-    log_warning("STL parse error");
+    log_fatal("STL parse error");
   }
 
   return result;

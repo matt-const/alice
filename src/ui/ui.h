@@ -146,3 +146,10 @@ typedef struct UI_Node_List {
 } UI_Node_List;
 
 typedef Array_Type(UI_Node) UI_Node_Array;
+
+typedef U32 UI_Node_Location;
+enum {
+  UI_Node_Location_None,
+  UI_Node_Location_Context,
+  UI_Node_Location_Overlay,
+};

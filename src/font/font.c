@@ -127,8 +127,8 @@ fn_internal void fo_font_init(FO_Font *font, Arena *arena, Str font_data, I32 fo
     }
 
     font->glyph_atlas_size = atlas_size;
-    font->glyph_atlas = r_texture_allocate(R_Texture_Format_RGBA_U08_Normalized, atlas_size.x, atlas_size.y);
-    r_texture_download(font->glyph_atlas, R_Texture_Format_RGBA_U08_Normalized, r2i(0, 0, atlas_size.x, atlas_size.y), texture_data);
+    font->glyph_atlas = r_texture_2D_allocate(R_Texture_Format_RGBA_U08_Normalized, atlas_size.x, atlas_size.y);
+    r_texture_2D_download(font->glyph_atlas, R_Texture_Format_RGBA_U08_Normalized, r2i(0, 0, atlas_size.x, atlas_size.y), texture_data);
   }
 
   STBTT_backend_free();

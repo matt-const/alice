@@ -21,6 +21,9 @@ fn vec4_unpack_u32(packed: u32) -> vec4<f32> {
     return vec4<f32>(r, g, b, a);
 }
 
+@group(0) @binding(3)
+var Texture_Volume : texture_3d<f32>;
+
 struct VS_Out {
     @builtin(position)  X : vec4<f32>,
     @location(0)        C : vec4<f32>,
